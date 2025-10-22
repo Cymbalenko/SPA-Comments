@@ -1,0 +1,14 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs
+/SPA-Comments/.vs/SPA-Comments
+/SPA-Comments/Common/obj
+/SPA-Comments/Dal/obj
+/SPA-Comments/Dto/obj
+/SPA-Comments/Resources/obj
+/SPA-Comments/Service/obj
+/SPA-Comments/spa-comments.client/.vscode
+/SPA-Comments/SPA-Comments.Server/obj
+/SPA-Comments/SPA-Comments.Server/SPA-Comments.Server.csproj.user
