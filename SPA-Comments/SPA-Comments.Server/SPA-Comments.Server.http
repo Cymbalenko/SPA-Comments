@@ -1,0 +1,6 @@
+@SPA_Comments.Server_HostAddress = http://localhost:5019
+
+GET {{SPA_Comments.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

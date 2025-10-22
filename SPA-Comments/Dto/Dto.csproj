@@ -1,0 +1,18 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Http.Features" Version="5.0.17" />
+	<PackageReference Include="HotChocolate" Version="15.1.11" />
+	<PackageReference Include="HotChocolate.AspNetCore" Version="15.1.11" />
+	<PackageReference Include="HotChocolate.Data" Version="15.1.11" />
+	<PackageReference Include="HotChocolate.Data.EntityFramework" Version="15.1.11" />
+	<PackageReference Include="HotChocolate.Types" Version="15.1.11" />
+  </ItemGroup>
+
+</Project>
