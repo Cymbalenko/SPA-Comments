@@ -1,0 +1,143 @@
+.comment-card {
+  margin: 16px 0;
+  padding: 16px;
+  border-radius: 8px;
+  background-color: #fff;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+  display: flex;
+  flex-direction: column;
+}
+
+.comment-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
+}
+
+.mat-card-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.avatar {
+  background-color: #3f51b5;
+  color: #fff;
+  font-size: 18px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-right: 12px;
+  font-weight: bold;
+}
+
+.mat-card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.mat-card-subtitle {
+  font-size: 14px;
+  color: #777;
+}
+
+.mat-card-subtitle a {
+  color: #2196f3;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.mat-card-subtitle a:hover {
+  color: #0d47a1;
+}
+
+.text {
+  margin: 12px 0;
+  color: #333;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap; /* Для сохранения форматирования */
+  word-break: break-word;
+}
+
+.files {
+  margin-top: 12px;
+}
+
+.file-entry {
+  margin-bottom: 8px;
+}
+
+.file-entry a {
+  color: #2196f3;
+  font-size: 14px;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.file-entry a:hover {
+  color: #0d47a1;
+}
+
+.mat-card-actions {
+  margin-top: 12px;
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+}
+
+button.mat-button {
+  font-size: 14px;
+  padding: 8px 16px;
+  border-radius: 4px;
+  transition: background-color 0.3s ease, transform 0.2s ease;
+}
+
+button.mat-button:hover {
+  background-color: #f0f0f0;
+  transform: scale(1.05);
+}
+
+button.mat-button.color-primary {
+  background-color: #3f51b5;
+  color: #fff;
+}
+
+button.mat-button.color-accent {
+  background-color: #e91e63;
+  color: #fff;
+}
+
+button.mat-button:active {
+  transform: scale(0.98);
+}
+
+.reply-form {
+  margin-top: 16px;
+  padding: 16px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.children {
+  margin-left: 20px;
+  margin-top: 16px;
+  padding: 8px 0;
+  border-left: 2px solid #f0f0f0;
+  background-color: #f9f9f9;
+}
+
+.children .comment-card {
+  margin-top: 12px;
+}
+
+.children .comment-card:hover {
+  transform: translateY(0);
+  box-shadow: none;
+}

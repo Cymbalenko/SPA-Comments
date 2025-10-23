@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "@angular/cdk": "^17.3.10",
+    "@angular/material": "^17.3.10",
+    "@apollo/client": "^4.0.7",
+    "apollo-angular": "^4.2.1",
+    "graphql": "^16.11.0"
+  }
+}

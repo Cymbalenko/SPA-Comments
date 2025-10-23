@@ -11,7 +11,6 @@ namespace Dal.Data;
 
 public class ChatDbContext:DbContext
 {
-    public DbSet<EFMigrationsHistory> EFMigrationsHistories { get; set; }
     public DbSet<CommentModel> Comments { get; set; }
     public DbSet<UserModel> Users { get; set; }
     public DbSet<FileModel> Files { get; set; }

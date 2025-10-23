@@ -1,4 +1,5 @@
 ﻿using Dto.Comment;
+using HotChocolate.Data.Sorting;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -11,5 +12,5 @@ public interface ICommentService
 {
     public Task<int> CreateCommentAsync(CreateCommentDto dto);
 
-    public Task<GetCommentListResponse> GetParentCommentListAsync(int page = 1, int pageSize = 25, string sort = "desc");
+    public Task<GetCommentListResponse> GetParentCommentListAsync(int page, int pageSize, string sort, string sortField);
 }

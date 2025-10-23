@@ -1,0 +1,23 @@
+<mat-card class="file-preview-card">
+  <mat-card-header>
+    <mat-card-title>{{ data.fileName }}</mat-card-title>
+    <mat-card-actions>
+      <button mat-icon-button (click)="close()"><mat-icon>close</mat-icon></button>
+    </mat-card-actions>
+  </mat-card-header>
+
+  <mat-card-content>
+    <div class="preview-body">
+      <!-- image -->
+      <img *ngIf="data.contentType?.startsWith('image/')" [src]="data.url" alt="{{data.fileName}}" class="preview-image" />
+
+      <!-- text -->
+      <pre *ngIf="data.contentType === 'text/plain'" class="preview-text">{{ loadText() }}</pre>
+
+      <!-- fallback: open in new tab -->
+      <div *ngIf="!data.contentType">
+        <a [href]="data.url" target="_blank" rel="noopener">Open file</a>
+      </div>
+    </div>
+  </mat-card-content>
+</mat-card>

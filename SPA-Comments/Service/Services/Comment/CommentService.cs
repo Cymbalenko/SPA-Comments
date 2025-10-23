@@ -3,10 +3,12 @@ using Common.Exceptions;
 using Dal.Data;
 using Dal.Models;
 using Dto.Comment;
+using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,20 +19,24 @@ public class CommentService: ICommentService
 {
     private readonly ChatDbContext _db;
     private readonly IMapper _mapper;
-    public CommentService(ChatDbContext db, IMapper mapper)
+    private readonly IValidator<CreateCommentDto> _createValidator;
+    public CommentService(ChatDbContext db, IMapper mapper, IValidator<CreateCommentDto> createValidator)
     {
         _db = db;
         _mapper = mapper;
+        _createValidator = createValidator;
     }
     #region create
     public async Task<int> CreateCommentAsync(CreateCommentDto dto)
     {
+        _createValidator.ValidateAndThrow(dto);
         using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
             var currentUserId = await GetCurrentUserId(dto);
             var commentEntity = _mapper.Map<CommentModel>(dto);
             commentEntity.UserId = currentUserId;
+            commentEntity.CreatedAt = DateTime.UtcNow;
             _db.Comments.Add(commentEntity);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -54,6 +60,7 @@ public class CommentService: ICommentService
         }
         else {
             var newUser = _mapper.Map<UserModel>(dto);
+            newUser.CreatedAt = DateTime.UtcNow;
             _db.Users.Add(newUser);
             await  _db.SaveChangesAsync();
             return newUser.Id;
@@ -99,7 +106,7 @@ public class CommentService: ICommentService
     #endregion create
 
     #region view
-    public async Task<GetCommentListResponse> GetParentCommentListAsync(int page = 1, int pageSize = 25, string sort = "desc")
+    public async Task<GetCommentListResponse> GetParentCommentListAsync(int page, int pageSize, string sort, string sortField)
     {
         try
         {
@@ -108,25 +115,84 @@ public class CommentService: ICommentService
                 Page = page,
                 PageSize = pageSize
             };
-            var query = _db.Comments.Where(c => c.ParentId == null)
-                                    .OrderByDescending(c => c.CreatedAt);
 
-            response.TotalCount = await query.CountAsync();
-            var items = await query.Skip((page - 1) * pageSize).Take(pageSize)
-                                .Include(c => c.Replies)
-                                .ToListAsync();
+            IOrderedQueryable<CommentModel> queryOrdered;
+            // Начальный запрос для комментариев, где ParentId == null
+            var query = _db.Comments.Where(c => c.ParentCommentId == null)
+                                     .Include(a => a.User) // Загрузим User для каждого комментария
+                                     .Include(c => c.Replies) // Загрузим все ответы на комментарий
+                                     .ThenInclude(r => r.User); // Загрузим User для каждого ответа
+
+            // Если поле для сортировки указано, создаем динамическое выражение сортировки
+            if (!string.IsNullOrEmpty(sortField))
+            {
+                // Определяем параметр для сортировки
+                var param = Expression.Parameter(typeof(CommentModel), "c");
+                Expression property;
+
+                // Проверяем, какое поле для сортировки
+                if (sortField.Equals("userName", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Сортировка по полю UserName из связанной модели User
+                    property = Expression.Property(Expression.Property(param, "User"), "UserName");
+                }
+                else if (sortField.Equals("email", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Сортировка по полю Email из связанной модели User
+                    property = Expression.Property(Expression.Property(param, "User"), "Email");
+                }
+                else if (sortField.Equals("createdAt", StringComparison.OrdinalIgnoreCase))
+                {
+                    // Сортировка по полю CreatedAt из основной модели CommentModel
+                    property = Expression.Property(param, "CreatedAt");
+                }
+                else
+                {
+                    // В случае неизвестного поля, сортировка по умолчанию по CreatedAt
+                    property = Expression.Property(param, "CreatedAt");
+                }
+
+                var lambda = Expression.Lambda<Func<CommentModel, object>>(Expression.Convert(property, typeof(object)), param);
+
+                // Проверяем, какое направление сортировки передано
+                if (string.IsNullOrEmpty(sort) || sort.ToLower() == "desc")
+                {
+                    // Сортировка по убыванию
+                    queryOrdered = query.OrderByDescending(lambda);
+                }
+                else
+                {
+                    // Сортировка по возрастанию
+                    queryOrdered = query.OrderBy(lambda);
+                }
+            }
+            else
+            {
+                // Если не указано поле сортировки, по умолчанию сортируем по дате в порядке убывания
+                queryOrdered = query.OrderByDescending(c => c.CreatedAt);
+            }
+
+            // Получаем общее количество записей
+            response.TotalCount = await queryOrdered.CountAsync();
+
+            // Получаем данные для текущей страницы
+            var items = await queryOrdered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
 
             if (items != null)
             {
                 var dataMap = _mapper.Map<List<CommentDto>>(items);
                 response.Data = dataMap;
             }
+
             return response;
         }
         catch (Exception ex)
         {
             throw new BaseException(ex.Message, "GetParentCommentList", "Comment Service error", HttpStatusCode.BadRequest);
-        } 
+        }
     }
+
+
+
     #endregion view
 }

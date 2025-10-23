@@ -12,3 +12,14 @@
 /SPA-Comments/spa-comments.client/.vscode
 /SPA-Comments/SPA-Comments.Server/obj
 /SPA-Comments/SPA-Comments.Server/SPA-Comments.Server.csproj.user
+/SPA-Comments/SPA-Comments.Server/bin
+/SPA-Comments/Service/bin
+/SPA-Comments/Dto/bin
+/SPA-Comments/Resources/bin
+/SPA-Comments/Dal/bin
+/SPA-Comments/.vs/ProjectEvaluation
+/SPA-Comments/Common/bin
+/SPA-Comments/spa-comments.client/obj
+/SPA-Comments/spa-comments.client/bin
+/SPA-Comments/spa-comments.client/package-lock.json
+/SPA-Comments/SPA-Comments.slnLaunch.user
