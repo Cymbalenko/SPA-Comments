@@ -3,12 +3,14 @@ using Dto.GraphQL.Comment;
 using FluentValidation;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Nest;
 using NLog;
 using NLog.Web;
 using Service.Extentions;
 using Service.GraphQL.Comment;
 using Service.Validators.Comment;
 using SPA_Comments.Server;
+using SPA_Comments.Server.Hubs;
 using System.Reflection;
  
 var logger = NLog.LogManager.Setup().LoadConfigurationFromAppSettings().GetCurrentClassLogger();
@@ -25,13 +27,26 @@ try
                   .AllowAnyHeader(); // Разрешить все заголовки
         });
     });
+
+    var environment = builder.Environment.EnvironmentName; // Получаем текущую среду
+
+    builder.Configuration
+        .SetBasePath(Directory.GetCurrentDirectory()) // Устанавливаем базовый путь
+        .AddJsonFile($"appsettings.{environment}.json", optional: true, reloadOnChange: true)  // Подключаем соответствующий конфиг для текущей среды
+        .AddEnvironmentVariables();
+
     builder.Services.AddDbContext<ChatDbContext>(options =>
     {
-        var connString = builder.Configuration.GetConnectionString("DefaultConnection")
-                         ?? "Server=mssql;Database=CommentsDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True";
+        var connString = builder.Configuration.GetConnectionString("DefaultConnection");
         options.UseSqlServer(connString, x => x.MigrationsAssembly("Dal"));
     }, ServiceLifetime.Scoped);
 
+    // Настройка подключения к Elasticsearch
+    var elasticsearchUri = builder.Configuration.GetValue<string>("ElasticSearch:Url");
+    var settings = new ConnectionSettings(new Uri(elasticsearchUri))
+        .DefaultIndex("comments");
+
+    builder.Services.AddSingleton<IElasticClient>(new ElasticClient(settings));
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
@@ -42,6 +57,7 @@ try
     }, typeof(MappingProfile));
     builder.Services.AddValidatorsFromAssemblyContaining<Program>();
     builder.Services.AddValidatorsFromAssemblyContaining<CreateCommentDtoValidator>();
+    builder.Services.AddHostedService<RabbitMqElasticsearchListener>();
 
     // HotChocolate
     builder.Services

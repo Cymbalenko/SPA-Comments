@@ -4,7 +4,10 @@ using Dal.Data;
 using Dal.Models;
 using Dto.Comment;
 using FluentValidation;
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Nest;
+using Service.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -12,19 +15,24 @@ using System.Linq.Expressions;
 using System.Net;
 using System.Text;
 using System.Threading.Tasks;
+using SortOrder = Nest.SortOrder;
 
 namespace Service.Services.Comment;
 
 public class CommentService: ICommentService
 {
+    private readonly IElasticClient _elasticClient;
+    private readonly IRabbitMqPublisher _rabbitMqPublisher;
     private readonly ChatDbContext _db;
     private readonly IMapper _mapper;
     private readonly IValidator<CreateCommentDto> _createValidator;
-    public CommentService(ChatDbContext db, IMapper mapper, IValidator<CreateCommentDto> createValidator)
+    public CommentService(ChatDbContext db, IMapper mapper, IValidator<CreateCommentDto> createValidator, IRabbitMqPublisher rabbitMqPublisher, IElasticClient elasticClient)
     {
         _db = db;
         _mapper = mapper;
         _createValidator = createValidator;
+        _rabbitMqPublisher = rabbitMqPublisher;
+        _elasticClient = elasticClient;
     }
     #region create
     public async Task<int> CreateCommentAsync(CreateCommentDto dto)
@@ -33,13 +41,19 @@ public class CommentService: ICommentService
         using var transaction = await _db.Database.BeginTransactionAsync();
         try
         {
-            var currentUserId = await GetCurrentUserId(dto);
+            var currentUser = await GetCurrentUser(dto);
             var commentEntity = _mapper.Map<CommentModel>(dto);
-            commentEntity.UserId = currentUserId;
+            commentEntity.UserId = currentUser.Id;
+            commentEntity.User = currentUser;
             commentEntity.CreatedAt = DateTime.UtcNow;
             _db.Comments.Add(commentEntity);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
+
+            // Отправляем новый комментарий в очередь RabbitMQ
+            var comentDto = _mapper.Map<CommentDto>(commentEntity);
+            await _rabbitMqPublisher.PublishAsync(RabbitMqPublisher.RabbitCommentExcenge, "new_comment", comentDto);
+
             return commentEntity.Id;
         }
         catch (Exception ex)
@@ -49,21 +63,20 @@ public class CommentService: ICommentService
         }
     }
 
-    private async Task<int> GetCurrentUserId(CreateCommentDto dto)
+    private async Task<UserModel> GetCurrentUser(CreateCommentDto dto)
     {
-        var entityId = await _db.Users.Where(a=>a.UserName.ToUpper() == dto.UserName.Trim().ToUpper())
-            .Select(a=>a.Id)
+        var entity = await _db.Users.Where(a=>a.UserName.ToUpper() == dto.UserName.Trim().ToUpper())
             .FirstOrDefaultAsync();
-        if(entityId > 0)
+        if(entity != null)
         {
-            return entityId;
+            return entity;
         }
         else {
             var newUser = _mapper.Map<UserModel>(dto);
             newUser.CreatedAt = DateTime.UtcNow;
             _db.Users.Add(newUser);
             await  _db.SaveChangesAsync();
-            return newUser.Id;
+            return newUser;
         }
     }
     private string GetFileContentType(string fileExtension)
@@ -105,7 +118,7 @@ public class CommentService: ICommentService
     }
     #endregion create
 
-    #region view
+    #region view 
     public async Task<GetCommentListResponse> GetParentCommentListAsync(int page, int pageSize, string sort, string sortField)
     {
         try
@@ -115,74 +128,15 @@ public class CommentService: ICommentService
                 Page = page,
                 PageSize = pageSize
             };
+             
+            var searchResponse = await SearchInElasticAsync(page, pageSize, sort, sortField);
 
-            IOrderedQueryable<CommentModel> queryOrdered;
-            // Начальный запрос для комментариев, где ParentId == null
-            var query = _db.Comments.Where(c => c.ParentCommentId == null)
-                                     .Include(a => a.User) // Загрузим User для каждого комментария
-                                     .Include(c => c.Replies) // Загрузим все ответы на комментарий
-                                     .ThenInclude(r => r.User); // Загрузим User для каждого ответа
-
-            // Если поле для сортировки указано, создаем динамическое выражение сортировки
-            if (!string.IsNullOrEmpty(sortField))
+            if (searchResponse != null && searchResponse.IsValid)
             {
-                // Определяем параметр для сортировки
-                var param = Expression.Parameter(typeof(CommentModel), "c");
-                Expression property;
-
-                // Проверяем, какое поле для сортировки
-                if (sortField.Equals("userName", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Сортировка по полю UserName из связанной модели User
-                    property = Expression.Property(Expression.Property(param, "User"), "UserName");
-                }
-                else if (sortField.Equals("email", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Сортировка по полю Email из связанной модели User
-                    property = Expression.Property(Expression.Property(param, "User"), "Email");
-                }
-                else if (sortField.Equals("createdAt", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Сортировка по полю CreatedAt из основной модели CommentModel
-                    property = Expression.Property(param, "CreatedAt");
-                }
-                else
-                {
-                    // В случае неизвестного поля, сортировка по умолчанию по CreatedAt
-                    property = Expression.Property(param, "CreatedAt");
-                }
-
-                var lambda = Expression.Lambda<Func<CommentModel, object>>(Expression.Convert(property, typeof(object)), param);
-
-                // Проверяем, какое направление сортировки передано
-                if (string.IsNullOrEmpty(sort) || sort.ToLower() == "desc")
-                {
-                    // Сортировка по убыванию
-                    queryOrdered = query.OrderByDescending(lambda);
-                }
-                else
-                {
-                    // Сортировка по возрастанию
-                    queryOrdered = query.OrderBy(lambda);
-                }
-            }
-            else
-            {
-                // Если не указано поле сортировки, по умолчанию сортируем по дате в порядке убывания
-                queryOrdered = query.OrderByDescending(c => c.CreatedAt);
-            }
-
-            // Получаем общее количество записей
-            response.TotalCount = await queryOrdered.CountAsync();
-
-            // Получаем данные для текущей страницы
-            var items = await queryOrdered.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-
-            if (items != null)
-            {
-                var dataMap = _mapper.Map<List<CommentDto>>(items);
-                response.Data = dataMap;
-            }
+                // Если данные найдены в Elasticsearch
+                response.TotalCount = (int)searchResponse.Total;
+                response.Data = _mapper.Map<List<CommentDto>>(searchResponse.Documents.ToList());
+            } 
 
             return response;
         }
@@ -192,7 +146,118 @@ public class CommentService: ICommentService
         }
     }
 
+    // 2. Функция для поиска в Elasticsearch
+    private async Task<ISearchResponse<CommentDto>> SearchInElasticAsync(
+     int page,
+     int pageSize,
+     string sort,
+     string sortField,
+     bool onlyRootComments = true
+ )
+    {
+        var from = (page - 1) * pageSize;
+        var order = sort.Equals("desc", StringComparison.OrdinalIgnoreCase)
+            ? SortOrder.Descending
+            : SortOrder.Ascending;
 
+        // ✅ Создаём BoolQuery сразу с нужными условиями
+        var boolQuery = new BoolQuery
+        {
+            MustNot = onlyRootComments
+                ? new List<QueryContainer>
+                {
+                new ExistsQuery { Field = "parentId" }
+                }
+                : null
+        };
+
+        // ✅ Формируем поисковый запрос
+        var searchRequest = new SearchRequest<CommentDto>("comments")
+        {
+            From = from,
+            Size = pageSize,
+            Sort = new List<ISort>
+        {
+            new FieldSort
+            {
+                Field = GetSortField(sortField),
+                Order = order
+            }
+        },
+            Query = boolQuery
+        };
+
+        var searchResponse = await _elasticClient.SearchAsync<CommentDto>(searchRequest);
+
+        if (!searchResponse.IsValid)
+        {
+            Console.WriteLine($"Elastic error: {searchResponse.OriginalException?.Message}");
+            return new SearchResponse<CommentDto>();
+        }
+
+        return searchResponse;
+    }
+
+
+
+
+
+    // 3. Функция для поиска в базе данных, если нет данных в Elasticsearch
+    private async Task<List<CommentModel>> SearchInDatabaseAsync(int page, int pageSize, string sort, string sortField)
+    {
+        var query = _db.Comments.Where(c => c.ParentId == null)
+                                 .Include(a => a.User)
+                                 .Include(c => c.Replies)
+                                 .ThenInclude(r => r.User);
+
+       var res = ApplySorting(query, sort, sortField);
+
+        return await res.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
+    }
+
+    // 4. Функция для применения сортировки к запросу
+    private IQueryable<CommentModel> ApplySorting(IQueryable<CommentModel> query, string sort, string sortField)
+    {
+        if (!string.IsNullOrEmpty(sortField))
+        {
+            var param = Expression.Parameter(typeof(CommentModel), "c");
+            Expression property = Expression.Property(param, sortField);
+
+            var lambda = Expression.Lambda<Func<CommentModel, object>>(Expression.Convert(property, typeof(object)), param);
+
+            return string.IsNullOrEmpty(sort) || sort.ToLower() == "desc"
+                ? query.OrderByDescending(lambda)
+                : query.OrderBy(lambda);
+        }
+
+        return query.OrderByDescending(c => c.CreatedAt);  // По умолчанию сортировка по CreatedAt
+    }
+
+    // 5. Функция для получения поля сортировки
+    private string GetSortField(string sortField)
+    {
+        return sortField switch
+        {
+            "userName" => "userName.keyword",
+            "email" => "email.keyword",
+            "createdAt" => "createdAt",
+            _ => "createdAt"
+        };
+    }
+
+    // 6. Функция для добавления данных в Elasticsearch
+    private async Task AddToElasticAsync(List<CommentModel> items)
+    {
+        var bulkIndexResponse = await _elasticClient.BulkAsync(b => b
+            .IndexMany(items)  // Добавляем все найденные данные в Elasticsearch
+        );
+
+        if (!bulkIndexResponse.IsValid)
+        {
+            // Обработка ошибок индексации
+            throw new BaseException("Error indexing to Elasticsearch", "GetParentCommentList", "Elastic indexing error", HttpStatusCode.InternalServerError);
+        }
+    }
 
     #endregion view
 }
