@@ -1,5 +1,4 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
-using Service.Comment;
 using Service.Services.Comment;
 using System;
 using System.Collections.Generic;
@@ -12,7 +11,7 @@ namespace Service.Extentions;
 
 public static class DependencyInjection
 {
-    public static IServiceCollection AddServices(this IServiceCollection services)
+    public static IServiceCollection AddBlServices(this IServiceCollection services)
     {
         services.AddScoped<ICommentService, CommentService>();
 

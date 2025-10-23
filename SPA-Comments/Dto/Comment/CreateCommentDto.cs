@@ -15,5 +15,5 @@ public class CreateCommentDto
     public string CAPTCHA { get; set; }
     public string Text { get; set; }
     public int? ParentCommentId { get; set; }
-    public List<IFormFile> Files { get; set; }
+    public List<IFormFile>? Files { get; set; }
 }

@@ -20,10 +20,11 @@ public class Query
     public async Task<GetCommentListResponse> GetParentCommentsAsync(
         int page = 1,
         int pageSize = 25,
+        string sortField = "userName",
         string sort = "desc")
     {
         // переиспользуем существующий метод сервиса
-        var res = await _service.GetParentCommentList(page, pageSize, sort);
+        var res = await _service.GetParentCommentListAsync(page, pageSize, sort, sortField);
         return res;
     }
 }

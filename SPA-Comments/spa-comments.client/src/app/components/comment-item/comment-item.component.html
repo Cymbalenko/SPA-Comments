@@ -1,0 +1,14 @@
+<!-- Компонент CommentItem (для отображения одного комментария) -->
+<div class="comment">
+  <div class="comment-header">
+    <strong>{{ comment.userName }}</strong> | {{ comment.createdAt | date:'short' }}
+  </div>
+  <div class="comment-body">
+    <p [innerHTML]="comment.text"></p>
+  </div>
+  <div *ngIf="comment.replies && comment.replies.length > 0">
+    <div class="replies">
+      <app-comment-item *ngFor="let reply of comment.replies" [comment]="reply"></app-comment-item>
+    </div>
+  </div>
+</div>

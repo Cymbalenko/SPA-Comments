@@ -1,0 +1,104 @@
+// Стили для карточки предварительного просмотра файла
+.file-preview-card {
+  max-height: 80vh; // Ограничиваем высоту карточки
+  overflow: hidden; // Скроем всё, что выходит за пределы
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+  padding: 16px;
+}
+
+// Стили для заголовка карточки
+mat-card-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #ddd;
+}
+
+// Стиль для заголовка в карточке
+mat-card-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+// Стиль для кнопки закрытия
+mat-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+button.mat-icon-button {
+  color: #2196f3;
+  font-size: 24px;
+  padding: 4px;
+
+  &:hover {
+    background-color: #f0f0f0;
+    border-radius: 50%;
+  }
+}
+
+// Стиль для контента карточки
+mat-card-content {
+  padding: 16px;
+  overflow: hidden;
+}
+
+// Стиль для тела превью
+.preview-body {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-direction: column; // Для адаптивности, если будет текст или изображение
+  padding: 12px;
+  overflow: auto;
+  max-height: 60vh;
+  background-color: #fafafa;
+  border-radius: 8px;
+}
+
+// Стиль для изображения
+.preview-image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain; // Сохраняем пропорции изображения
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+}
+
+// Стиль для текстового превью
+.preview-text {
+  white-space: pre-wrap; // Сохранение форматирования текста
+  word-wrap: break-word; // Разбиение длинных слов на строки
+  max-height: 70vh;
+  overflow: auto;
+  width: 100%;
+  font-size: 14px;
+  color: #333;
+  background-color: #fff;
+  padding: 12px;
+  border-radius: 8px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+// Стиль для fallback ссылки
+.preview-body div {
+  text-align: center;
+}
+
+.preview-body a {
+  color: #2196f3;
+  font-size: 16px;
+  text-decoration: none;
+  padding: 10px;
+  background-color: #fafafa;
+  border-radius: 4px;
+  transition: background-color 0.3s ease;
+}
+
+.preview-body a:hover {
+  background-color: #f0f0f0;
+}

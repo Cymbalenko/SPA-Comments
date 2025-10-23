@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36603.0 d17.14
+VisualStudioVersion = 17.14.36603.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{54A90642-561A-4BB1-A94E-469ADEE60C69}") = "spa-comments.client", "spa-comments.client\spa-comments.client.esproj", "{8BC5C088-5918-CAA9-BA0E-B4437CA51BA7}"
 EndProject
@@ -14,6 +14,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Common", "Common\Common.csproj", "{E15E491A-E872-91D8-DF7A-CA59C792F064}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Service", "Service\Service.csproj", "{02B79BC5-153E-2FD9-CAE3-8149E0D9044F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Resources", "Resources\Resources.csproj", "{61585738-A726-2BEB-69E8-040F08657BC9}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -47,6 +49,10 @@ Global
 		{02B79BC5-153E-2FD9-CAE3-8149E0D9044F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{02B79BC5-153E-2FD9-CAE3-8149E0D9044F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{02B79BC5-153E-2FD9-CAE3-8149E0D9044F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{61585738-A726-2BEB-69E8-040F08657BC9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{61585738-A726-2BEB-69E8-040F08657BC9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{61585738-A726-2BEB-69E8-040F08657BC9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{61585738-A726-2BEB-69E8-040F08657BC9}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

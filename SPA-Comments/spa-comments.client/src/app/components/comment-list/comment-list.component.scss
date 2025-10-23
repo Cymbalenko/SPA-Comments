@@ -1,0 +1,90 @@
+mat-card {
+  background-color: #fff;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  padding: 16px;
+  border-radius: 8px;
+  margin: 16px 0;
+  font-family: 'Roboto', sans-serif;
+}
+
+mat-card-title {
+  font-size: 24px;
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 16px;
+}
+
+.loading, .error {
+  text-align: center;
+  font-size: 18px;
+  margin-top: 20px;
+}
+
+.loading {
+  color: #00796b;
+}
+
+.error {
+  color: #d32f2f;
+}
+
+table {
+  width: 100%;
+  margin-top: 20px;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.mat-header-cell {
+  background-color: #2196f3;
+  color: white;
+  padding: 12px 16px;
+  text-align: left;
+}
+
+.mat-cell {
+  padding: 12px 16px;
+  color: #555;
+}
+
+.mat-row:nth-child(odd) {
+  background-color: #f9f9f9;
+}
+
+.mat-row:hover {
+  background-color: #e3f2fd;
+  cursor: pointer;
+}
+
+mat-paginator {
+  margin-top: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  font-size: 14px;
+}
+
+.comment {
+  background-color: #f5f5f5;
+  padding: 16px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.comment-header {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.comment-body {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
+.replies {
+  margin-top: 16px;
+  padding-left: 20px;
+  border-left: 2px solid #ccc;
+}
