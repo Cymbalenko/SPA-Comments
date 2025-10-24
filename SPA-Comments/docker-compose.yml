@@ -35,6 +35,8 @@ services:
         condition: service_started
       elasticsearch:
         condition: service_started 
+      mssql:
+        condition: service_started 
     networks:
       - spa_net
 
