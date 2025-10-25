@@ -49,4 +49,6 @@ public class CommentModel
 
     [InverseProperty(nameof(ParentComment))]
     public virtual ICollection<CommentModel> Replies { get; set; }
+     
+    public virtual ICollection<FileModel> Files { get; set; }
 }

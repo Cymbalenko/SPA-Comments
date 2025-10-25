@@ -1,5 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Service.Messaging;
+using Service.Services.Azure;
+using Service.Services.Captcha;
 using Service.Services.Comment;
 using System;
 using System.Collections.Generic;
@@ -15,8 +17,9 @@ public static class DependencyInjection
     public static IServiceCollection AddBlServices(this IServiceCollection services)
     {
         services.AddScoped<IRabbitMqPublisher, RabbitMqPublisher>();
-        services.AddScoped<ICommentService, CommentService>(); 
-
+        services.AddScoped<ICommentService, CommentService>();
+        services.AddSingleton<IFileStorageService, AzureFileStorageService>();
+        services.AddSingleton<ICaptchaService, CaptchaService>();
         return services;
     }
 }

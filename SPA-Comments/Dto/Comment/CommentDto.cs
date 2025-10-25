@@ -18,5 +18,5 @@ public class CommentDto
     public int? ParentCommentId { get; set; }
     public DateTime CreatedAt { get; set; }
     public List<CommentDto> Replies { get; set; } = new List<CommentDto>();
-    //public List<IFormFile> Files { get; set; }
+    public List<CommentFileDto> Files { get; set; } = new List<CommentFileDto>();
 }

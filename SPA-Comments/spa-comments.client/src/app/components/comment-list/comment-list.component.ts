@@ -1,10 +1,17 @@
-import { ChangeDetectorRef, AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
-import { CommentsService } from '../../services/comment.service';
+import {
+  ChangeDetectorRef,
+  AfterViewInit,
+  Component,
+  OnInit,
+  ViewChild
+} from '@angular/core';
+import { CommentsGraphqlService } from '../../services/graphql.service';
 import { MatPaginator } from '@angular/material/paginator';
 import { MatSort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { merge, of } from 'rxjs';
 import { startWith, switchMap, map, catchError } from 'rxjs/operators';
+import { CommentSignalRService } from '../../services/comment-signalr.service';
 
 @Component({
   selector: 'app-comment-list',
@@ -22,9 +29,22 @@ export class CommentListComponent implements OnInit, AfterViewInit {
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
-  constructor(private svc: CommentsService, private cdRef: ChangeDetectorRef) { }
+  constructor(
+    private svc: CommentsGraphqlService,
+    private signalR:CommentSignalRService,
+    private cdRef: ChangeDetectorRef
+  ) { }
 
-  ngOnInit() { }
+  ngOnInit() {
+    this.signalR.startConnection();
+    this.signalR.newComment$.subscribe(comment => {
+      if (comment) {
+        console.log('Adding new comment to table', comment);
+        this.dataSource.data = [comment, ...this.dataSource.data];
+        this.cdRef.detectChanges();
+      }
+    });
+  }
 
   ngAfterViewInit() {
     this.sort.active = 'createdAt';
@@ -37,27 +57,29 @@ export class CommentListComponent implements OnInit, AfterViewInit {
         switchMap(() => {
           this.isLoading = true;
           this.errorMsg = undefined;
+
           const page = (this.paginator.pageIndex || 0) + 1;
           const pageSize = this.paginator.pageSize || this.pageSize;
           const sortField = this.sort.active || 'createdAt';
-          const sort = (this.sort.direction || 'desc').toUpperCase();
-          return this.svc.getTopComments(page, pageSize, sortField, sort as 'ASC' | 'DESC');
+          const sort = (this.sort.direction || 'desc').toLowerCase() as
+            | 'asc'
+            | 'desc';
+
+          return this.svc.getParentComments(page, pageSize, sortField, sort);
         }),
         map(result => {
-          console.log('Loaded comments result:', result);
           this.isLoading = false;
-          this.total = result.totalCount;
-          return result.data;
+          this.total = result.totalCount || 0;
+          return result.data || [];
         }),
         catchError(err => {
-          console.error(err);
+          console.error('GraphQL error:', err);
           this.isLoading = false;
           this.errorMsg = 'Ошибка загрузки комментариев';
           return of([]);
         })
       )
       .subscribe(items => {
-        console.log('Loaded comments:', items);
         this.dataSource.data = items;
         this.cdRef.detectChanges();
       });
@@ -68,15 +90,14 @@ export class CommentListComponent implements OnInit, AfterViewInit {
   }
 
   showReplyForm(comment: any) {
-    // Show the reply form, you may need a separate form component or method
     comment.showReplyForm = !comment.showReplyForm;
   }
 
   onReplyAdded() {
-    this.paginator._changePageSize(this.paginator.pageSize);  // Refresh current page
+    this.paginator._changePageSize(this.paginator.pageSize);
   }
 
   onCommentSubmitted() {
-    this.paginator._changePageSize(this.paginator.pageSize);  // Reload data after submitting a new comment
+    this.paginator._changePageSize(this.paginator.pageSize);
   }
 }

@@ -1,4 +1,5 @@
-﻿using Dto.Comment;
+﻿using Common.Helper;
+using Dto.Comment;
 using FluentValidation;
 using Ganss.Xss;
 using System;
@@ -32,6 +33,18 @@ public class CreateCommentDtoValidator : AbstractValidator<CreateCommentDto>
         RuleFor(x => x.Text)
             .NotEmpty().WithMessage("Text is required.")
             .Must(SanitizeCommentHtml).WithMessage("HTML tags are not allowed in Text.");
+
+        RuleForEach(x => x.Files)
+                .Custom((file, context) =>
+                {
+                    if (file != null)
+                    {
+                        if (!FileHelper.IsValidFile(file, out string error))
+                        {
+                            context.AddFailure($"File '{file.FileName}' is invalid: {error}");
+                        }
+                    }
+                });
     }
 
     public bool SanitizeCommentHtml(string inputHtml)

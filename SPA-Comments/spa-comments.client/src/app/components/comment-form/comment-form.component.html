@@ -36,7 +36,7 @@
       <div class="previews">
         <div *ngFor="let f of previewFiles; let i = index" class="preview">
           <div *ngIf="f.type === 'image'">
-            <img [src]="f.url" alt="{{f.name}}" (click)="$event.preventDefault()" />
+            <img [src]="f.url" alt="{{f.name}}" (click)="openLightbox(i)" class="preview-img" />
           </div>
           <div *ngIf="f.type === 'text'">
             <pre>{{ f.url }}</pre>
@@ -46,14 +46,13 @@
       </div>
     </div>
 
-    <div class="captcha">
-      <img [src]="captchaUrl" alt="captcha" />
-      <button mat-button type="button" (click)="refreshCaptcha()">Refresh</button>
-      <mat-form-field appearance="fill">
-        <mat-label>Captcha</mat-label>
-        <input matInput formControlName="captcha">
-      </mat-form-field>
+    <div>
+      <img [src]="captchaUrl" alt="captcha" (click)="loadCaptcha()" style="cursor:pointer" />
+      <input type="text" formControlName="captcha" placeholder="Введите текст с картинки" />
     </div>
+
+    <div *ngIf="captchaValid" style="color: green">✅ CAPTCHA верна</div>
+    <div *ngIf="errorMessage" style="color: red">{{ errorMessage }}</div>
 
     <div class="actions">
       <button mat-raised-button color="primary" type="submit" [disabled]="uploading">Send</button>

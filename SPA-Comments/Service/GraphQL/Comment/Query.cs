@@ -17,7 +17,7 @@ public class Query
         _service = service;
     }
      
-    public async Task<GetCommentListResponse> GetParentCommentsAsync(
+    public async Task<GetCommentListResponse> GetParentComments(
         int page = 1,
         int pageSize = 25,
         string sortField = "userName",

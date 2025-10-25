@@ -16,39 +16,24 @@ services:
       - spa_net
     mem_limit: 4g 
 
-  # 🟦 ASP.NET + Angular приложение
-  spa-comments:
-    container_name: spa-comments
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-    environment:
-      - ASPNETCORE_ENVIRONMENT=Development
-      - ConnectionStrings__DefaultConnection=Server=mssql;Database=CommentsDb;User Id=sa;Password=Passw0rd1;TrustServerCertificate=True;Encrypt=False
-      - RabbitMQ__Host=rabbitmq
-      - ElasticSearch__Url=http://elasticsearch:9200
-    depends_on:
-      rabbitmq:
-        condition: service_started
-      elasticsearch:
-        condition: service_started 
-      mssql:
-        condition: service_started 
-    networks:
-      - spa_net
-
   # 🟩 RabbitMQ
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
     ports:
       - "5672:5672"
       - "15672:15672"
     networks:
       - spa_net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
   # 🟨 Elasticsearch
   elasticsearch:
@@ -62,6 +47,58 @@ services:
       - "9200:9200"
     networks:
       - spa_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  # 🟪 Azurite (эмулятор Azure Blob Storage)
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: azurite
+    command: "azurite-blob --blobHost 0.0.0.0 --loose"
+    ports:
+      - "10000:10000"
+    volumes:
+      - azurite_data:/data
+    networks:
+      - spa_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:10000/devstoreaccount1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+
+  # 🟦 ASP.NET + Angular приложение
+  spa-comments:
+    container_name: spa-comments
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+      - "8081:8081"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__DefaultConnection=Server=mssql;Database=CommentsDb;User Id=sa;Password=Passw0rd1;TrustServerCertificate=True;Encrypt=False
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__Port=5672
+      - RabbitMQ__UserName=guest
+      - RabbitMQ__Password=guest
+      - ElasticSearch__Url=http://elasticsearch:9200
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+      mssql:
+        condition: service_started
+    networks:
+      - spa_net
 
   # 🟧 Kibana (для удобного просмотра индексов)
   kibana:
@@ -72,12 +109,14 @@ services:
     ports:
       - "5601:5601"
     depends_on:
-      - elasticsearch
+      elasticsearch:
+        condition: service_healthy
     networks:
       - spa_net
 
 volumes:
   mssql_data:
+  azurite_data:
 
 networks:
   spa_net:

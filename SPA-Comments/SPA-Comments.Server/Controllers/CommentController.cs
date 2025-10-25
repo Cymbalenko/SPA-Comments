@@ -1,6 +1,7 @@
 ﻿using Dto.Comment;
 using FluentValidation;
 using Microsoft.AspNetCore.Mvc;
+using Service.Services.Azure;
 using Service.Services.Comment;
 
 namespace SPA_Comments.Server.Controllers;
@@ -19,9 +20,16 @@ public class CommentController : ControllerBase
     [HttpPost("create")]
     public async Task<IActionResult> CreateCommentAsync([FromForm] CreateCommentDto dto)
     {
+        var captcha = HttpContext.Session.GetString("CaptchaCode");
+        if (captcha == null || !captcha.Equals(dto.CAPTCHA, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest("Invalid CAPTCHA");
+        }
+
         var id = await _service.CreateCommentAsync(dto);
         return Ok(id);
     }
+
 
     [HttpGet("getCommentList")]
     public async Task<IActionResult> GetParentCommentListAsync([FromQuery] int page = 1,[FromQuery] string sortField = "userName", [FromQuery] int pageSize = 25, [FromQuery] string sort = "desc")

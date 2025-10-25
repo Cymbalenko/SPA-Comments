@@ -4,6 +4,8 @@ import { HttpClientModule } from '@angular/common/http';
 import { ReactiveFormsModule } from '@angular/forms';
 import { AppRoutingModule } from './app-routing.module';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { LightboxModule } from 'ngx-lightbox';
+import { FormsModule } from '@angular/forms';
 
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -50,7 +52,9 @@ import { FilePreviewComponent } from './components/file-preview/file-preview.com
     MatTooltipModule,
     MatProgressSpinnerModule,
     AppRoutingModule,
-    MatToolbarModule 
+    MatToolbarModule,
+    LightboxModule,
+    FormsModule
   ],
   providers: [],
   bootstrap: [AppComponent]
