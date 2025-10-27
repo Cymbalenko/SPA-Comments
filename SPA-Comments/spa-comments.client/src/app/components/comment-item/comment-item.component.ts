@@ -1,58 +1,77 @@
-import { Component, EventEmitter, Input, OnInit, Output } from '@angular/core';
-import { CommentsService, CommentDto } from '../../services/comment.service';
+import { Component, Input, Output, EventEmitter } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import DOMPurify from 'dompurify';
 import { MatDialog } from '@angular/material/dialog';
-import { FilePreviewComponent } from '../file-preview/file-preview.component';
+import { HttpClient } from '@angular/common/http';
+import { FileService } from '../../services/file.service';
 
 @Component({
   selector: 'app-comment-item',
   templateUrl: './comment-item.component.html',
   styleUrls: ['./comment-item.component.scss']
 })
-export class CommentItemComponent implements OnInit {
-  @Input() comment!: CommentDto;
-  @Output() refresh = new EventEmitter<void>();
-
-  safeHtml?: SafeHtml;
+export class CommentItemComponent {
+  @Input() comment: any;
+  @Output() replyAdded = new EventEmitter<any>(); // событие нового ответа
   showReplyForm = false;
-  children: CommentDto[] = [];
-  loadingChildren = false;
-  
-  constructor(private svc: CommentsService, private sanitizer: DomSanitizer, private dialog: MatDialog) {}
+  safeHtml: SafeHtml = '';
+
+  constructor(private sanitizer: DomSanitizer,
+    private dialog: MatDialog,
+    private http: HttpClient,
+    private fileService: FileService
+  ) { }
 
   ngOnInit() {
-    this.safeHtml = this.sanitizer.bypassSecurityTrustHtml(
-      DOMPurify.sanitize(this.comment.text, { ALLOWED_TAGS: ['a', 'code', 'i', 'strong'], ALLOWED_ATTR: ['href', 'title', 'target'] })
-    );
+    this.safeHtml = this.sanitizer.bypassSecurityTrustHtml(this.comment.text);
+    if (this.comment.files?.length) {
+      for (const f of this.comment.files) {
+        if (!f.isImage) this.loadTextPreview(f);
+      }
+    }
   }
 
-  toggleChildren() {
-    if (this.children.length) {
-      this.children = [];
+  loadTextPreview(file: any) {
+    if (!file.uri.endsWith('.txt')) return;
+
+    const match = file.uri.match(/comment-files\/(.+)$/);
+    const blobName = match ? match[1] : null;
+    if (!blobName) {
+      file.previewText = 'Ошибка: имя файла';
       return;
     }
-    this.loadingChildren = true;
-    this.svc.getCommentChildren(this.comment.id).subscribe({
-      next: items => {
-        this.children = items;
-        this.loadingChildren = false;
-      },
-      error: () => {
-        this.loadingChildren = false;
-      }
-    });
+
+    // Используем кэшированный SAS URL или получаем новый
+    if (file._sasUrl) {
+      this.fetchPreview(file);
+    } else {
+      this.fileService.getDownloadUrl(blobName).subscribe({
+        next: (res: any) => {
+          file._sasUrl = res.publicUrl;
+          this.fetchPreview(file);
+        },
+        error: () => file.previewText = 'Ошибка загрузки'
+      });
+    }
   }
-  
-  openPreview(file: { id: string; url: string; fileName: string; contentType: string }) {
-    this.dialog.open(FilePreviewComponent, {
-      data: file,
-      width: '80vw',
-      maxWidth: '900px'
-    });
+
+  private fetchPreview(file: any) {
+    fetch(file._sasUrl)
+      .then(r => {
+        if (!r.ok) throw new Error();
+        return r.text();
+      })
+      .then(text => {
+        file.previewText = text;
+      })
+      .catch(() => {
+        file.previewText = 'Не удалось загрузить';
+      });
   }
-  onReplySubmitted() {
+
+  onReplySubmitted(newReply: any) {
     this.showReplyForm = false;
-    this.refresh.emit();
+    if (newReply) {
+      this.replyAdded.emit(newReply); // передаем новый комментарий наверх
+    }
   }
 }

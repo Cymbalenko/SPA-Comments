@@ -75,8 +75,7 @@
           },
           "defaultConfiguration": "development",
           "options": {
-            "proxyConfig": "src/proxy.conf.js",
-            "port": 50885
+            "proxyConfig": "proxy.conf.js"
           }
         },
         "extract-i18n": {

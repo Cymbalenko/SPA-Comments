@@ -1,7 +1,7 @@
 version: '3.9'
 
 services:
-  # 🟥 MSSQL
+  # MSSQL
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: mssql
@@ -16,7 +16,7 @@ services:
       - spa_net
     mem_limit: 4g 
 
-  # 🟩 RabbitMQ
+  # RabbitMQ
   rabbitmq:
     image: rabbitmq:3.13-management
     container_name: rabbitmq
@@ -35,7 +35,7 @@ services:
       retries: 5
       start_period: 10s
 
-  # 🟨 Elasticsearch
+  # Elasticsearch
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
     container_name: elasticsearch
@@ -47,6 +47,8 @@ services:
       - "9200:9200"
     networks:
       - spa_net
+    volumes:
+      - es_data:/usr/share/elasticsearch/data
     healthcheck:
       test: ["CMD-SHELL", "curl -fs http://localhost:9200 || exit 1"]
       interval: 10s
@@ -54,15 +56,11 @@ services:
       retries: 5
       start_period: 15s
 
-  # 🟪 Azurite (эмулятор Azure Blob Storage)
+  # Azurite (без внешнего порта)
   azurite:
     image: mcr.microsoft.com/azure-storage/azurite
     container_name: azurite
     command: "azurite-blob --blobHost 0.0.0.0 --loose"
-    ports:
-      - "10000:10000"
-    volumes:
-      - azurite_data:/data
     networks:
       - spa_net
     healthcheck:
@@ -72,8 +70,20 @@ services:
       retries: 5
       start_period: 10s
 
+  # Nginx — прокси с CORS для Azurite
+  azurite-proxy:
+    image: nginx:alpine
+    container_name: azurite-proxy
+    ports:
+      - "10000:10000"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - azurite
+    networks:
+      - spa_net
 
-  # 🟦 ASP.NET + Angular приложение
+  # ASP.NET + Angular
   spa-comments:
     container_name: spa-comments
     build:
@@ -89,7 +99,8 @@ services:
       - RabbitMQ__Port=5672
       - RabbitMQ__UserName=guest
       - RabbitMQ__Password=guest
-      - ElasticSearch__Url=http://elasticsearch:9200
+      - ElasticSearch__Url=http://elasticsearch:9200 
+      - AzureStorage__ConnectionString=DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://azurite-proxy:10000/devstoreaccount1;
     depends_on:
       rabbitmq:
         condition: service_healthy
@@ -97,10 +108,12 @@ services:
         condition: service_healthy
       mssql:
         condition: service_started
+      azurite-proxy:
+        condition: service_started
     networks:
       - spa_net
 
-  # 🟧 Kibana (для удобного просмотра индексов)
+  # Kibana
   kibana:
     image: docker.elastic.co/kibana/kibana:8.15.0
     container_name: kibana
@@ -116,6 +129,7 @@ services:
 
 volumes:
   mssql_data:
+  es_data:
   azurite_data:
 
 networks:

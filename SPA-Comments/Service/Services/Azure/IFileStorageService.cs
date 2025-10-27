@@ -11,4 +11,6 @@ namespace Service.Services.Azure;
 public interface IFileStorageService
 {
     Task<string> UploadFileAsync(IFormFile file, string userName);
+    Task<FileDownloadResultDto?> GetFileAsync(string blobName); 
+    Task<string?> GetPublicUrlAsync(string blobName); 
 }

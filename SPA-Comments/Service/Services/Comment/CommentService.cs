@@ -113,44 +113,7 @@ public class CommentService: ICommentService
             await  _db.SaveChangesAsync();
             return newUser;
         }
-    }
-    private string GetFileContentType(string fileExtension)
-    {
-        string contentType = "application/octet-stream"; // По умолчанию
-
-        switch (fileExtension.ToLowerInvariant())
-        {
-            case ".jpg":
-            case ".jpeg":
-                contentType = "image/jpeg";
-                break;
-            case ".png":
-                contentType = "image/png";
-                break;
-            case ".gif":
-                contentType = "image/gif";
-                break;
-            case ".tif":
-            case ".tiff":
-                contentType = "image/tiff";
-                break;
-            case ".svg":
-            case ".svgz":
-                contentType = "image/svg+xml";
-                break;
-            case ".pdf":
-                contentType = "application/pdf";
-                break;
-            case ".html":
-                contentType = "text/html";
-                break;
-            case ".txt":
-                contentType = "text/plain";
-                break;
-        }
-
-        return contentType;
-    }
+    } 
     #endregion create
 
     #region view 
@@ -180,7 +143,7 @@ public class CommentService: ICommentService
             _logger.LogError(ex, ex.Message);
             throw new BaseException(ex.Message, "GetParentCommentList", "Comment Service error", HttpStatusCode.BadRequest);
         }
-    }
+    } 
 
     // 2. Функция для поиска в Elasticsearch
     private async Task<ISearchResponse<CommentDto>> SearchInElasticAsync(
@@ -234,9 +197,50 @@ public class CommentService: ICommentService
         return searchResponse;
     }
 
+    public async Task<List<CommentDto>> GetCommentsTreeAsync(int parentId)
+    {
+        // 1. Получаем все комментарии
+        var searchResponse = await _elasticClient.SearchAsync<CommentDto>(s => s
+            .Index("comments")
+            .Size(10000)
+            .Query(q => q.MatchAll())
+        );
 
-     
-    // 5. Функция для получения поля сортировки
+        if (!searchResponse.IsValid)
+            return new List<CommentDto>();
+
+        var allComments = searchResponse.Documents.ToList();
+
+        var childCounts = allComments
+        .Where(c => c.ParentId.HasValue)
+        .GroupBy(c => c.ParentId.Value)
+        .ToDictionary(g => g.Key, g => g.Count());
+
+        // Добавляем RepliesCount
+        foreach (var comment in allComments)
+        {
+            comment.RepliesCount = childCounts.ContainsKey(comment.Id)
+                ? childCounts[comment.Id]
+                : 0;
+        }
+
+        // 2. Строим дерево комментариев
+        var commentDict = allComments.ToDictionary(c => c.Id);
+
+        foreach (var comment in allComments)
+        {
+            if (comment.ParentId.HasValue && commentDict.ContainsKey(comment.ParentId.Value))
+            {
+                commentDict[comment.ParentId.Value].Replies ??= new List<CommentDto>();
+                commentDict[comment.ParentId.Value].Replies.Add(comment);
+            }
+        }
+
+        // 3. Возвращаем все комментарии, у которых ParentId = parentId
+        return allComments.Where(c => c.ParentId == parentId).ToList();
+    }
+
+
     private string GetSortField(string sortField)
     {
         return sortField switch

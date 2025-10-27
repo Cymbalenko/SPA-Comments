@@ -9,7 +9,7 @@ export interface CommentDto {
   homePage?: string;
   text: string;
   createdAt: string;
-  parentCommentId?: string | null;
+  parentId?: string | null;
   replies?: CommentDto[];
 }
 
@@ -29,31 +29,30 @@ export class CommentsGraphqlService {
     sort: 'asc' | 'desc' = 'desc'
   ): Observable<any> {
     const query = `
-      query parentComments($page: Int!, $pageSize: Int!, $sortField: String!, $sort: String!) {
-        parentComments(page: $page, pageSize: $pageSize, sortField: $sortField, sort: $sort) {
-          data {
+    query parentComments($page: Int!, $pageSize: Int!, $sortField: String!, $sort: String!) {
+      parentComments(page: $page, pageSize: $pageSize, sortField: $sortField, sort: $sort) {
+        data {
+          id
+          userName
+          email
+          homePage
+          text
+          parentId
+          createdAt
+          files {
             id
-            userName
-            email
-            homePage
-            text
-            parentCommentId
-            createdAt
-            replies {
-              id
-              userName
-              email
-              homePage
-              text
-              parentCommentId
-              createdAt
-            }
+            name
+            contentType
+            uri
+            isImage
+            uploadedAt
           }
-          totalCount
-          page
-          pageSize
         }
-      }`;
+        totalCount
+        page
+        pageSize
+      }
+    }`;
 
     const variables = { page, pageSize, sortField, sort };
 
@@ -70,7 +69,7 @@ export class CommentsGraphqlService {
     email: string;
     homePage?: string;
     text: string;
-    parentCommentId?: string | null;
+    parentId?: string | null;
     captchaToken: string;
   }): Observable<any> {
     const mutation = `
@@ -81,7 +80,7 @@ export class CommentsGraphqlService {
           email
           text
           createdAt
-          parentCommentId
+          parentId
         }
       }`;
 
@@ -95,24 +94,32 @@ export class CommentsGraphqlService {
   /**
    * Получение дочерних комментариев по parentId
    */
-  getReplies(parentCommentId: string): Observable<CommentDto[]> {
+  getReplies(parentId: number): Observable<CommentDto[]> {
     const query = `
-      query replies($parentCommentId: Int!) {
-        replies(parentCommentId: $parentCommentId) {
+    query replies($parentId: Int!) {
+      replies(parentId: $parentId) {
+        id
+        userName
+        email
+        homePage
+        text
+        createdAt
+        parentId
+        repliesCount
+        files {
           id
-          userName
-          email
-          homePage
-          text
-          createdAt
-          parentCommentId
+          name
+          contentType
+          uri
+          isImage
+          uploadedAt
         }
-      }`;
-
-    const variables = { parentCommentId: +parentCommentId };
+      }
+    }`;
 
     return this.http
-      .post<{ data: any }>(this.graphqlUrl, { query, variables })
-      .pipe(map((response) => response.data.replies));
+      .post<{ data: { replies: CommentDto[] } }>(this.graphqlUrl, { query, variables: { parentId } })
+      .pipe(map(res => res.data.replies));
   }
-}
+
+  }

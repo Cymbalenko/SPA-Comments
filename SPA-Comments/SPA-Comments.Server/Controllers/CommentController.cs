@@ -37,4 +37,12 @@ public class CommentController : ControllerBase
         var res = await _service.GetParentCommentListAsync(page, pageSize, sort, sortField);
         return Ok(res);
     }
+
+
+    [HttpGet("getCommentsTreeList")]
+    public async Task<IActionResult> GetCommentsTreeAsync([FromQuery] int parentId)
+    {
+        var res = await _service.GetCommentsTreeAsync(parentId);
+        return Ok(res);
+    }
 }

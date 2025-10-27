@@ -1,17 +1,20 @@
 import {
-  ChangeDetectorRef,
   AfterViewInit,
+  ChangeDetectorRef,
   Component,
   OnInit,
-  ViewChild
+  ViewChild,
 } from '@angular/core';
-import { CommentsGraphqlService } from '../../services/graphql.service';
 import { MatPaginator } from '@angular/material/paginator';
-import { MatSort } from '@angular/material/sort';
+import { MatSort, Sort } from '@angular/material/sort';
 import { MatTableDataSource } from '@angular/material/table';
 import { merge, of } from 'rxjs';
-import { startWith, switchMap, map, catchError } from 'rxjs/operators';
+import { catchError, map, startWith, switchMap } from 'rxjs/operators';
+import { CommentsGraphqlService } from '../../services/graphql.service';
 import { CommentSignalRService } from '../../services/comment-signalr.service';
+import { FileService } from '../../services/file.service';
+import DOMPurify from 'dompurify';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-comment-list',
@@ -19,61 +22,60 @@ import { CommentSignalRService } from '../../services/comment-signalr.service';
   styleUrls: ['./comment-list.component.scss']
 })
 export class CommentListComponent implements OnInit, AfterViewInit {
-  displayedColumns = ['userName', 'email', 'createdAt', 'actions'];
+  displayedColumns = ['expand', 'userName', 'email', 'createdAt', 'text'];
   dataSource = new MatTableDataSource<any>();
   total = 0;
   pageSize = 25;
   isLoading = false;
   errorMsg?: string;
+  selectedComment: any = null;
+  currentSort: { field: string; dir: 'asc' | 'desc' } = {
+    field: 'createdAt',
+    dir: 'desc',
+  };
+  showNewCommentForm = false;
 
   @ViewChild(MatPaginator) paginator!: MatPaginator;
   @ViewChild(MatSort) sort!: MatSort;
 
   constructor(
     private svc: CommentsGraphqlService,
-    private signalR:CommentSignalRService,
-    private cdRef: ChangeDetectorRef
+    private signalR: CommentSignalRService,
+    private cdRef: ChangeDetectorRef,
+    private fileService: FileService,
+    private sanitizer: DomSanitizer
   ) { }
 
   ngOnInit() {
     this.signalR.startConnection();
-    this.signalR.newComment$.subscribe(comment => {
-      if (comment) {
-        console.log('Adding new comment to table', comment);
-        this.dataSource.data = [comment, ...this.dataSource.data];
-        this.cdRef.detectChanges();
-      }
+
+    this.signalR.newComment$.subscribe((newComment: any) => {
+      if (!newComment) return;
+      this.replaceFileUrls(newComment);
+      this.addCommentToTree(newComment);
+      this.cdRef.detectChanges();
     });
   }
 
   ngAfterViewInit() {
-    this.sort.active = 'createdAt';
-    this.sort.direction = 'desc';
-    this.paginator.pageSize = this.pageSize;
-
-    merge(this.sort.sortChange, this.paginator.page)
+    merge(this.paginator.page, this.sort.sortChange)
       .pipe(
         startWith({}),
         switchMap(() => {
           this.isLoading = true;
-          this.errorMsg = undefined;
-
           const page = (this.paginator.pageIndex || 0) + 1;
           const pageSize = this.paginator.pageSize || this.pageSize;
-          const sortField = this.sort.active || 'createdAt';
-          const sort = (this.sort.direction || 'desc').toLowerCase() as
-            | 'asc'
-            | 'desc';
-
-          return this.svc.getParentComments(page, pageSize, sortField, sort);
+          const sortField = this.sort?.active || this.currentSort.field;
+          const sortDir = (this.sort?.direction || this.currentSort.dir) as 'asc' | 'desc';
+          this.currentSort = { field: sortField, dir: sortDir };
+          return this.svc.getParentComments(page, pageSize, sortField, sortDir);
         }),
         map(result => {
           this.isLoading = false;
           this.total = result.totalCount || 0;
-          return result.data || [];
+          return this.mapComments(result.data || []);
         }),
         catchError(err => {
-          console.error('GraphQL error:', err);
           this.isLoading = false;
           this.errorMsg = 'Ошибка загрузки комментариев';
           return of([]);
@@ -85,19 +87,163 @@ export class CommentListComponent implements OnInit, AfterViewInit {
       });
   }
 
-  toggleReplies(comment: any) {
-    comment.showReplies = !comment.showReplies;
+  private mapComments(comments: any[]): any[] {
+    return comments.map(c => { 
+
+      c.safeHtml = this.sanitizer.bypassSecurityTrustHtml(
+        DOMPurify.sanitize(c.text ?? '', {
+          ALLOWED_TAGS: ['b', 'i', 'strong', 'a', 'code', 'pre', 'u', 'p', 'br'],
+          ALLOWED_ATTR: ['href', 'target', 'title']
+        })
+      );
+      this.replaceFileUrls(c);
+      c.hasReplies = c.repliesCount && c.repliesCount > 0;
+      c.replies = undefined;
+
+      return c;
+    });
   }
 
-  showReplyForm(comment: any) {
-    comment.showReplyForm = !comment.showReplyForm;
+  replaceFileUrls(comment: any): void {
+    if (!comment.files?.length) return;
+
+    comment.files.forEach((file: any, index: number) => {
+      const match = file.uri?.match(/comment-files\/(.+)$/);
+      const blobName = match ? match[1] : null; 
+      if (!blobName) return;
+
+      // Сохраняем оригинальный URI, чтобы потом заменить
+      const originalUri = file.uri;
+
+      this.fileService.getDownloadUrl(blobName).subscribe({
+        next: (response: any) => {
+          const publicUrl = response.publicUrl;
+
+          // Если URL изменился — обновляем и принудительно триггерим
+          if (file.uri !== publicUrl) {
+            file.uri = publicUrl; 
+
+            // Критично: принудительно обновляем вид
+            this.cdRef.detectChanges();
+          }
+        },
+        error: (err) => {
+          console.error('Failed to get public URL:', err);
+          // Оставляем оригинальный URI
+          file.uri = originalUri;
+        }
+      });
+    });
   }
 
-  onReplyAdded() {
-    this.paginator._changePageSize(this.paginator.pageSize);
+  async onRowClick(row: any) {
+    // Если тот же комментарий — просто свернуть
+    if (this.selectedComment === row) {
+      this.selectedComment = null;
+      return;
+    }
+
+    this.isLoading = true;
+
+    try { 
+      if (row.replies === undefined) {
+        const fullReplies = await this.loadRepliesRecursive(row.id);
+        row.replies = fullReplies;
+        this.dataSource.data = [...this.dataSource.data];
+      }
+       
+      this.selectedComment = row;
+    } catch (err) {
+      console.error('Ошибка загрузки дерева комментариев:', err);
+    } finally {
+      this.isLoading = false;
+      this.cdRef.detectChanges();
+    }
   }
 
-  onCommentSubmitted() {
-    this.paginator._changePageSize(this.paginator.pageSize);
+  private async loadRepliesRecursive(commentId: number): Promise<any[]> {
+    try {
+      const replies = await this.svc.getReplies(commentId).toPromise();
+
+      const mapped = this.mapComments(replies || []);
+
+      for (const reply of mapped) {
+        if (reply.hasReplies || (reply.repliesCount && reply.repliesCount > 0)) {
+          reply.replies = await this.loadRepliesRecursive(reply.id);
+        } else {
+          reply.replies = [];
+        }
+      }
+
+      return mapped;
+    } catch (err) {
+      console.error('Ошибка загрузки ответов:', err);
+      return [];
+    }
+  }
+
+
+  private addCommentToTree(newComment: any) {
+    if (!newComment.parentId) {
+      this.dataSource.data = [newComment, ...this.dataSource.data];
+    } else {
+      const parent = this.findParent(this.dataSource.data, newComment.parentId);
+      if (parent) {
+        parent.replies ??= [];
+        parent.replies.push(newComment);
+        this.dataSource.data = [...this.dataSource.data];
+      }
+    }
+  }
+
+  private findParent(comments: any[], parentId: string): any | null {
+    for (const c of comments) {
+      if (c.id === parentId) return c;
+      if (c.replies?.length) {
+        const found = this.findParent(c.replies, parentId);
+        if (found) return found;
+      }
+    }
+    return null;
+  }
+
+  showReplyForm(row: any) {
+    this.selectedComment = this.selectedComment === row ? null : row;
+    this.cdRef.detectChanges();
+  }
+
+  reload() {
+    if (this.paginator) this.paginator.firstPage();
+    this.isLoading = true;
+
+    this.svc.getParentComments(1, this.pageSize, this.currentSort.field, this.currentSort.dir).subscribe({
+      next: result => {
+        this.isLoading = false;
+        this.total = result.totalCount || 0;
+        this.dataSource.data = this.mapComments(result.data || []);
+        this.cdRef.detectChanges();
+      },
+      error: () => {
+        this.isLoading = false;
+        this.errorMsg = 'Ошибка загрузки комментариев';
+      }
+    });
+  }
+
+  onSortChange(event: Sort) {
+    this.currentSort = { field: event.active, dir: event.direction as any || 'desc' };
+  }
+
+  getCommentPreview(text: string): SafeHtml {
+    if (!text) return '';
+    const preview = text.length > 120 ? text.slice(0, 120) + '…' : text;
+    return this.sanitizer.bypassSecurityTrustHtml(preview);
+  }
+
+  onReplySubmitted(newReply?: any) {
+    if (!newReply) return;
+    this.addCommentToTree(newReply);
+    this.selectedComment = null;
+    this.cdRef.detectChanges();
   }
 }

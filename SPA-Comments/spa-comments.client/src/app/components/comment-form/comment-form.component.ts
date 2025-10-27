@@ -75,12 +75,37 @@ export class CommentFormComponent implements OnInit {
     this.previewHtml = this.sanitizer.bypassSecurityTrustHtml(sanitized);
   }
 
-  validateHtmlTags(text: string): boolean {
-    const div = document.createElement('div');
-    div.innerHTML = text; 
-    const sanitized = div.innerHTML;
-    return sanitized === text;
+  // Проверка корректности тегов и вложенности
+  validateHtmlTagsStrict(text: string): boolean {
+    const allowedTags = ['a', 'code', 'i', 'strong'];
+    const stack: string[] = [];
+
+    // регулярка для поиска тегов
+    const tagRegex = /<\/?([a-z]+)[^>]*>/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+      const tag = match[1].toLowerCase();
+      const isClosing = match[0].startsWith('</');
+
+      if (!allowedTags.includes(tag)) {
+        return false; // запрещённый тег
+      }
+
+      if (isClosing) {
+        const last = stack.pop();
+        if (last !== tag) {
+          return false; // неправильная вложенность
+        }
+      } else {
+        stack.push(tag); // открывающий тег
+      }
+    }
+
+    return stack.length === 0; // все теги закрыты
   }
+
+
 
   onFileSelected(ev: Event) {
     const input = ev.target as HTMLInputElement;
@@ -183,6 +208,12 @@ export class CommentFormComponent implements OnInit {
 
       // sanitize text server-side is required, но отправляем sanitized HTML
       const raw = this.form.value.text || '';
+      if (!this.validateHtmlTagsStrict(raw)) {
+        this.errorMessage = 'Некорректные HTML-теги или вложение';
+        return;
+      }
+
+      // Очистка перед отправкой
       const sanitized = DOMPurify.sanitize(raw, {
         ALLOWED_TAGS: ['a', 'code', 'i', 'strong'],
         ALLOWED_ATTR: ['href', 'title', 'target']

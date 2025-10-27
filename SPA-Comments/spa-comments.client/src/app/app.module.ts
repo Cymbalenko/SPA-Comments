@@ -18,21 +18,21 @@ import { MatSortModule } from '@angular/material/sort';
 import { MatDialogModule } from '@angular/material/dialog';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { CommonModule } from '@angular/common';
+
 
 import { AppComponent } from './app.component'; 
 import { MatToolbarModule } from '@angular/material/toolbar'; 
 import { CommentItemComponent } from './components/comment-item/comment-item.component';
 import { CommentListComponent } from './components/comment-list/comment-list.component';
 import { CommentFormComponent } from './components/comment-form/comment-form.component';
-import { FilePreviewComponent } from './components/file-preview/file-preview.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     CommentItemComponent,
     CommentListComponent,
-    CommentFormComponent,
-    FilePreviewComponent
+    CommentFormComponent
   ],
   imports: [
     BrowserModule,
@@ -54,6 +54,7 @@ import { FilePreviewComponent } from './components/file-preview/file-preview.com
     AppRoutingModule,
     MatToolbarModule,
     LightboxModule,
+    CommonModule,
     FormsModule
   ],
   providers: [],

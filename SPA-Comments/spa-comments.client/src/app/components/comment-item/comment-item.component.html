@@ -1,14 +1,46 @@
-<!-- Компонент CommentItem (для отображения одного комментария) -->
-<div class="comment">
+<mat-card class="comment-card">
   <div class="comment-header">
-    <strong>{{ comment.userName }}</strong> | {{ comment.createdAt | date:'short' }}
-  </div>
-  <div class="comment-body">
-    <p [innerHTML]="comment.text"></p>
-  </div>
-  <div *ngIf="comment.replies && comment.replies.length > 0">
-    <div class="replies">
-      <app-comment-item *ngFor="let reply of comment.replies" [comment]="reply"></app-comment-item>
+    <div class="avatar">{{ comment.userName?.charAt(0) | uppercase }}</div>
+    <div class="header-content">
+      <div class="header-row">
+        <span class="username">{{ comment.userName }}</span>
+        <span class="date">{{ comment.createdAt | date:'dd.MM.yyyy HH:mm' }}</span>
+      </div>
     </div>
   </div>
-</div>
+
+  <div class="comment-body" [innerHTML]="safeHtml"></div>
+
+  <div class="attachments" *ngIf="comment.files?.length">
+    <h5>Файлы:</h5>
+    <div *ngFor="let f of comment.files" class="file-entry">
+      <ng-container *ngIf="f.isImage; else otherFile">
+        <img class="comment-image" [src]="f.uri"  />
+      </ng-container>
+      <ng-template #otherFile>
+        <div class="preview text-preview" >
+          <pre>{{ f.previewText || 'Загрузка...' }}</pre>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <div class="comment-actions">
+    <button mat-button color="primary" (click)="showReplyForm = !showReplyForm">
+      {{ showReplyForm ? 'Отмена' : 'Ответить' }}
+    </button>
+  </div>
+
+  <div *ngIf="showReplyForm" class="reply-form">
+    <app-comment-form [parentId]="comment.id"
+                      (submitted)="onReplySubmitted($event)">
+    </app-comment-form>
+  </div>
+
+  <div class="children" *ngIf="comment.replies?.length">
+    <app-comment-item *ngFor="let child of comment.replies"
+                      [comment]="child"
+                      (replyAdded)="comment.replies.push($event)">
+    </app-comment-item>
+  </div>
+</mat-card>

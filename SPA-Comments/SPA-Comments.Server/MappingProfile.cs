@@ -11,10 +11,9 @@ public class MappingProfile : Profile
 
         #region Comment
         CreateMap<CommentDto, CommentModel>()
-        .ForMember(v => v.ParentId, opt => opt.MapFrom(t => t.ParentCommentId))
         .ForMember(v => v.Files, opt => opt.Ignore());
+
         CreateMap<CommentModel, CommentDto>()
-        .ForMember(v => v.ParentCommentId, opt => opt.MapFrom(t => t.ParentId))
         .ForMember(v => v.Files, opt => opt.Ignore())
         .AfterMap((entity, model) =>
         {
@@ -23,13 +22,12 @@ public class MappingProfile : Profile
                 model.UserName = entity.User.UserName;
                 model.HomePage = entity.User.HomePage;
                 model.Email = entity.User.Email;
-            }
+            } 
         });
         CreateMap<CreateCommentDto, CommentModel>()
-            .ForMember(v => v.ParentId, opt => opt.MapFrom(t => t.ParentCommentId ))
             .ForMember(v => v.Files, opt => opt.Ignore());
+
         CreateMap<CommentModel, CreateCommentDto>()
-            .ForMember(v => v.ParentCommentId, opt => opt.MapFrom(t => t.ParentId))
             .ForMember(v => v.Files, opt => opt.Ignore());
 
         CreateMap<CreateCommentDto, UserModel>();
