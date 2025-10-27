@@ -37,6 +37,12 @@ public class ChatDbContext:DbContext
         .HasForeignKey(c => c.ParentId)
         .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<FileModel>()
+        .HasOne(c => c.Comment)
+        .WithMany(c => c.Files)
+        .HasForeignKey(c => c.CommentId)
+        .OnDelete(DeleteBehavior.Restrict);
+
         modelBuilder.Entity<CommentModel>()
             .HasOne(c => c.User)
             .WithMany(u => u.Comments)

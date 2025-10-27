@@ -15,8 +15,9 @@ public class CommentDto
     public string? HomePage { get; set; }
     public string CAPTCHA { get; set; }
     public string Text { get; set; }
-    public int? ParentCommentId { get; set; }
+    public int? ParentId { get; set; }
     public DateTime CreatedAt { get; set; }
+    public int RepliesCount { get; set; }
     public List<CommentDto> Replies { get; set; } = new List<CommentDto>();
-    //public List<IFormFile> Files { get; set; }
+    public List<CommentFileDto> Files { get; set; } = new List<CommentFileDto>();
 }

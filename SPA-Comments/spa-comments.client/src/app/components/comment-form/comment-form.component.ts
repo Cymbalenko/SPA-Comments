@@ -3,6 +3,8 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { CommentsService } from '../../services/comment.service';
 import DOMPurify from 'dompurify';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { Lightbox } from 'ngx-lightbox';
+import { CaptchaService } from '../../services/captcha.service';
 
 const URL_REGEX = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w\-._~:?#[\]@!$&'()*+,;=]*)?$/;
 
@@ -14,21 +16,25 @@ const URL_REGEX = /^(https?:\/\/)?([\w-]+\.)+[\w-]+(\/[\w\-._~:?#[\]@!$&'()*+,;=
 export class CommentFormComponent implements OnInit {
   @Input() parentId?: string | null = null; // for reply
   @Output() submitted = new EventEmitter<void>();
-  captchaUrl!: string;
   form!: FormGroup;
   previewHtml?: SafeHtml;
   uploading = false;
   selectedFiles: File[] = [];
   previewFiles: Array<{ type: 'image' | 'text', url: string, name: string }> = [];
-
+  captchaUrl: any;
+  captchaValue = '';
+  captchaValid = false;
+  errorMessage = '';
   constructor(
     private fb: FormBuilder,
     private commentsService: CommentsService,
+    private lightbox: Lightbox,
+    private captchaService: CaptchaService,
     private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit() {
-    this.captchaUrl = this.getCaptchaUrl();
+    this.loadCaptcha();
     this.form = this.fb.group({
       userName: ['', [Validators.required, Validators.pattern(/^[A-Za-z0-9_-]{2,30}$/)]],
       email: ['', [Validators.required, Validators.email]],
@@ -68,10 +74,39 @@ export class CommentFormComponent implements OnInit {
     });
     this.previewHtml = this.sanitizer.bypassSecurityTrustHtml(sanitized);
   }
-  refreshCaptcha() {
-    // Implement the refresh logic for the captcha
-    console.log('Captcha refreshed');
+
+  // Проверка корректности тегов и вложенности
+  validateHtmlTagsStrict(text: string): boolean {
+    const allowedTags = ['a', 'code', 'i', 'strong'];
+    const stack: string[] = [];
+
+    // регулярка для поиска тегов
+    const tagRegex = /<\/?([a-z]+)[^>]*>/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = tagRegex.exec(text)) !== null) {
+      const tag = match[1].toLowerCase();
+      const isClosing = match[0].startsWith('</');
+
+      if (!allowedTags.includes(tag)) {
+        return false; // запрещённый тег
+      }
+
+      if (isClosing) {
+        const last = stack.pop();
+        if (last !== tag) {
+          return false; // неправильная вложенность
+        }
+      } else {
+        stack.push(tag); // открывающий тег
+      }
+    }
+
+    return stack.length === 0; // все теги закрыты
   }
+
+
+
   onFileSelected(ev: Event) {
     const input = ev.target as HTMLInputElement;
     if (!input.files) return;
@@ -130,49 +165,108 @@ export class CommentFormComponent implements OnInit {
     this.selectedFiles.splice(idx, 1);
   }
 
-  getCaptchaUrl(): string {
-    return `/api/captcha-image?ts=${new Date().getTime()}`;
+  openLightbox(index: number) {
+    const album = this.previewFiles.map(f => ({
+      src: f.url,
+      caption: f.name,
+      thumb: f.url
+    }));
+    this.lightbox.open(album, index);
   }
-
+   
   async onSubmit() {
+    // Сначала проверяем валидность формы
+    console.log('onSubmit this.captchaValue', this.captchaValue);
     if (this.form.invalid) {
+      console.log('this.form.invalid', this.form);
       this.form.markAllAsTouched();
+      // даже если форма не валидна — обновляем капчу
+      this.form.controls['captcha'].setValue('');
+      this.loadCaptcha();
       return;
     }
+    console.log('this.form.valid', this.form);
+
     this.uploading = true;
 
-    // sanitize text server-side is required, but send sanitized HTML as well
-    const raw = this.form.value.text || '';
-    const sanitized = DOMPurify.sanitize(raw, {
-      ALLOWED_TAGS: ['a', 'code', 'i', 'strong'],
-      ALLOWED_ATTR: ['href', 'title', 'target']
-    });
-
-    const input = {
-      userName: this.form.value.userName,
-      email: this.form.value.email,
-      homePage: this.form.value.homePage || null,
-      text: sanitized,
-      parentId: this.parentId || null,
-      captchaToken: this.form.value.captcha
-    };
-
     try {
-      const res = await this.commentsService.addComment({
+      // Проверяем CAPTCHA
+      const captchaText = this.form.value.captcha;
+      const isCaptchaValid = await this.captchaService.validateCaptcha(captchaText).toPromise();
+
+      if (!isCaptchaValid) {
+        this.errorMessage = 'Неправильная CAPTCHA';
+        this.captchaValid = false;
+        this.form.controls['captcha'].setValue('');
+        this.loadCaptcha();
+        this.uploading = false;
+        return;
+      }
+
+      this.captchaValid = true;
+      this.errorMessage = '';
+
+      // sanitize text server-side is required, но отправляем sanitized HTML
+      const raw = this.form.value.text || '';
+      if (!this.validateHtmlTagsStrict(raw)) {
+        this.errorMessage = 'Некорректные HTML-теги или вложение';
+        return;
+      }
+
+      // Очистка перед отправкой
+      const sanitized = DOMPurify.sanitize(raw, {
+        ALLOWED_TAGS: ['a', 'code', 'i', 'strong'],
+        ALLOWED_ATTR: ['href', 'title', 'target']
+      });
+
+      const input = {
+        userName: this.form.value.userName,
+        email: this.form.value.email,
+        homePage: this.form.value.homePage || null,
+        text: sanitized,
+        parentId: this.parentId || null,
+        captchaToken: this.form.value.captcha
+      };
+
+      // Отправляем комментарий
+      await this.commentsService.addComment({
         ...input,
         files: this.selectedFiles
       }).toPromise();
-      // success
+
+      // сброс формы и превью
       this.form.reset();
       this.previewHtml = undefined;
       this.selectedFiles = [];
       this.previewFiles = [];
-      this.uploading = false;
       this.submitted.emit();
+
     } catch (err) {
       console.error(err);
       alert('Error submitting comment');
+    } finally {
+      // В любом случае очищаем CAPTCHA
+      this.form.controls['captcha'].setValue('');
+      this.loadCaptcha();
       this.uploading = false;
     }
+  }
+
+  loadCaptcha(): void {
+    this.captchaService.getCaptchaImage().subscribe((url) => (this.captchaUrl = url));
+  }
+  checkCaptcha(): void {
+    console.log('captchaValue', this.captchaValue);
+    this.captchaService.validateCaptcha(this.captchaValue).subscribe({
+      next: (result) => {
+        this.captchaValid = result;
+        this.errorMessage = '';
+      },
+      error: (err) => {
+        this.errorMessage = 'Неправильная CAPTCHA';
+        this.form.controls['captcha'].setValue('');
+        this.loadCaptcha();
+      },
+    });
   }
 }

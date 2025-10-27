@@ -1,67 +1,79 @@
-<mat-card>
-  <form [formGroup]="form" (ngSubmit)="onSubmit()">
-    <mat-form-field appearance="fill" class="full">
-      <mat-label>User Name</mat-label>
+<mat-card class="comment-card">
+  <form [formGroup]="form" (ngSubmit)="onSubmit()" class="comment-form">
+
+    <!-- User Name -->
+    <mat-form-field appearance="outline" class="full">
+      <label>Имя пользователя</label>
       <input matInput formControlName="userName">
-      <mat-error *ngIf="form.controls['userName'].hasError('required')">Required</mat-error>
+      <mat-error *ngIf="form.controls['userName'].hasError('required')">Поле обязательно</mat-error>
+      <mat-error *ngIf="form.controls['userName'].hasError('pattern')">
+        Допустимы только латиница, цифры, _ и -, 2-30 символов
+      </mat-error>
     </mat-form-field>
 
-    <mat-form-field appearance="fill" class="full">
-      <mat-label>Email</mat-label>
+    <!-- Email -->
+    <mat-form-field appearance="outline" class="full">
+      <label>Email</label>
       <input matInput formControlName="email">
-      <mat-error *ngIf="form.controls['email'].invalid">Invalid email</mat-error>
+      <mat-error *ngIf="form.controls['email'].hasError('required')">Поле обязательно</mat-error>
+      <mat-error *ngIf="form.controls['email'].hasError('email')">Некорректный email</mat-error>
     </mat-form-field>
 
-    <mat-form-field appearance="fill" class="full">
-      <mat-label>Home page (optional)</mat-label>
+    <!-- Home Page -->
+    <mat-form-field appearance="outline" class="full">
+      <label>Домашняя страница (необязательно)</label>
       <input matInput formControlName="homePage">
+      <mat-error *ngIf="form.controls['homePage'].hasError('pattern')">Некорректный URL</mat-error>
     </mat-form-field>
 
+    <!-- Toolbar (над полем текста) -->
     <div class="toolbar">
       <button type="button" mat-mini-fab color="primary" (click)="insertTag('strong')"><b>B</b></button>
       <button type="button" mat-mini-fab color="primary" (click)="insertTag('i')"><i>I</i></button>
       <button type="button" mat-mini-fab color="primary" (click)="insertTag('code')"><code>c</code></button>
       <button type="button" mat-mini-fab color="primary" (click)="insertTag('a')">link</button>
-      <button type="button" mat-mini-fab (click)="preview()">Preview</button>
+      <button type="button" mat-mini-fab color="accent" (click)="preview()">Preview</button>
     </div>
 
-    <mat-form-field appearance="fill" class="full">
-      <mat-label>Text</mat-label>
-      <textarea id="comment-text" matInput rows="6" formControlName="text"></textarea>
-      <mat-error *ngIf="form.controls['text'].invalid">Enter comment text</mat-error>
+    <!-- Comment Text -->
+    <mat-form-field appearance="outline" class="full">
+      <label>Комментарий</label>
+      <textarea matInput id="comment-text" rows="6" formControlName="text"></textarea>
+      <mat-error *ngIf="form.controls['text'].hasError('required')">Поле обязательно</mat-error>
+      <mat-error *ngIf="form.controls['text'].hasError('minlength')">Минимум 3 символа</mat-error>
     </mat-form-field>
 
+    <!-- File Upload -->
     <div class="file-section">
-      <input type="file" id="file" (change)="onFileSelected($event)" multiple accept=".txt,image/png,image/jpeg,image/gif" />
+      <input type="file" id="file" (change)="onFileSelected($event)" multiple accept=".txt,image/*" />
       <div class="previews">
         <div *ngFor="let f of previewFiles; let i = index" class="preview">
-          <div *ngIf="f.type === 'image'">
-            <img [src]="f.url" alt="{{f.name}}" (click)="$event.preventDefault()" />
-          </div>
-          <div *ngIf="f.type === 'text'">
-            <pre>{{ f.url }}</pre>
-          </div>
-          <button mat-mini-button color="warn" (click)="removePreview(i)">Remove</button>
+          <img *ngIf="f.type === 'image'" [src]="f.url" alt="{{f.name}}" (click)="openLightbox(i)" />
+          <pre *ngIf="f.type === 'text'">{{ f.url }}</pre>
+          <button mat-mini-button color="warn" (click)="removePreview(i)">Удалить</button>
         </div>
       </div>
     </div>
 
+    <!-- CAPTCHA -->
     <div class="captcha">
-      <img [src]="captchaUrl" alt="captcha" />
-      <button mat-button type="button" (click)="refreshCaptcha()">Refresh</button>
-      <mat-form-field appearance="fill">
-        <mat-label>Captcha</mat-label>
-        <input matInput formControlName="captcha">
-      </mat-form-field>
-    </div>
+      <img [src]="captchaUrl" alt="captcha" (click)="loadCaptcha()" />
+      <input type="text" formControlName="captcha" placeholder="Введите текст с картинки" />
+    </div> 
+    <div *ngIf="errorMessage" class="captcha-error">{{ errorMessage }}</div>
 
+    <!-- Submit Button -->
     <div class="actions">
-      <button mat-raised-button color="primary" type="submit" [disabled]="uploading">Send</button>
+      <button mat-raised-button color="primary" type="submit" [disabled]="uploading">
+        Отправить
+      </button>
     </div>
-  </form>
 
-  <div *ngIf="previewHtml" class="preview-block">
-    <h3>Preview</h3>
-    <div [innerHTML]="previewHtml"></div>
-  </div>
+    <!-- Preview Block -->
+    <div *ngIf="previewHtml" class="preview-block">
+      <h3>Предпросмотр</h3>
+      <div [innerHTML]="previewHtml"></div>
+    </div>
+
+  </form>
 </mat-card>

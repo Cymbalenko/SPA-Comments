@@ -87,11 +87,6 @@ namespace Dal.Migrations
                         .HasColumnType("nvarchar(max)")
                         .HasColumnName("ContentType");
 
-                    b.Property<byte[]>("Data")
-                        .IsRequired()
-                        .HasColumnType("varbinary(max)")
-                        .HasColumnName("FileData");
-
                     b.Property<byte>("IsImage")
                         .HasColumnType("tinyint")
                         .HasColumnName("IsImage");
@@ -104,6 +99,11 @@ namespace Dal.Migrations
                     b.Property<DateTime>("UploadedAt")
                         .HasColumnType("datetime2")
                         .HasColumnName("UploadedAt");
+
+                    b.Property<string>("Uri")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)")
+                        .HasColumnName("FileUri");
 
                     b.HasKey("Id");
 
@@ -165,9 +165,9 @@ namespace Dal.Migrations
             modelBuilder.Entity("Dal.Models.FileModel", b =>
                 {
                     b.HasOne("Dal.Models.CommentModel", "Comment")
-                        .WithMany()
+                        .WithMany("Files")
                         .HasForeignKey("CommentId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.Navigation("Comment");
@@ -175,6 +175,8 @@ namespace Dal.Migrations
 
             modelBuilder.Entity("Dal.Models.CommentModel", b =>
                 {
+                    b.Navigation("Files");
+
                     b.Navigation("Replies");
                 });
 

@@ -30,8 +30,8 @@ public class FileModel
     public string ContentType { get; set; }
 
     [Required]
-    [Column("FileData")]
-    public byte[] Data { get; set; }
+    [Column("FileUri")]
+    public string Uri { get; set; }
 
     [Required]
     [Column("IsImage")]

@@ -1,0 +1,11 @@
+{
+  "blobCORS": [
+    {
+      "allowedOrigins": ["*"],
+      "allowedMethods": ["GET", "HEAD", "OPTIONS"],
+      "allowedHeaders": ["*"],
+      "exposedHeaders": ["*"],
+      "maxAgeInSeconds": 3600
+    }
+  ]
+}

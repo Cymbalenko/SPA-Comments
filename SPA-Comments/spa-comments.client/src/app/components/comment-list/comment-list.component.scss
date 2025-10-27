@@ -1,90 +1,76 @@
-mat-card {
-  background-color: #fff;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  padding: 16px;
-  border-radius: 8px;
-  margin: 16px 0;
-  font-family: 'Roboto', sans-serif;
-}
-
-mat-card-title {
-  font-size: 24px;
-  font-weight: bold;
-  color: #333;
-  margin-bottom: 16px;
-}
-
-.loading, .error {
-  text-align: center;
-  font-size: 18px;
-  margin-top: 20px;
-}
-
-.loading {
-  color: #00796b;
-}
-
-.error {
-  color: #d32f2f;
-}
-
-table {
+/* Базовые стили таблицы */
+.full-width-table {
   width: 100%;
-  margin-top: 20px;
-  border-collapse: collapse;
-  font-size: 14px;
 }
 
-.mat-header-cell {
-  background-color: #2196f3;
-  color: white;
-  padding: 12px 16px;
-  text-align: left;
-}
-
-.mat-cell {
-  padding: 12px 16px;
-  color: #555;
-}
-
-.mat-row:nth-child(odd) {
-  background-color: #f9f9f9;
+.mat-row {
+  background-color: #fff !important;
+  transition: background-color 0.2s ease;
 }
 
 .mat-row:hover {
-  background-color: #e3f2fd;
+  background-color: #f1f9ff !important;
   cursor: pointer;
 }
 
-mat-paginator {
-  margin-top: 20px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 0;
-  font-size: 14px;
+/* выделенная строка */
+.selected-row {
+  background-color: #e3f2fd !important;
+  box-shadow: inset 0 0 0 2px #2196f3;
 }
 
-.comment {
-  background-color: #f5f5f5;
-  padding: 16px;
-  margin-bottom: 8px;
+/* превью комментария */
+.comment-preview {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 500px;
+  color: #333;
+}
+
+/* панель под таблицей */
+.detail-panel {
+  margin-top: 18px;
+  background: #fafafa;
+  border-left: 3px solid #2196f3;
   border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
 }
 
-.comment-header {
-  font-size: 16px;
-  font-weight: bold;
+/* плавная анимация появления/исчезновения */
+:host ::ng-deep .detail-panel.ng-animating {
+  overflow: hidden;
 }
 
-.comment-body {
-  margin-top: 8px;
-  font-size: 14px;
+.comment-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 15px;
+  line-height: 1.45;
+  color: #222;
+}
+
+.files {
+  margin-top: 12px;
 }
 
 .replies {
-  margin-top: 16px;
-  padding-left: 20px;
-  border-left: 2px solid #ccc;
+  margin-top: 12px;
+  padding-left: 16px;
+  border-left: 2px solid #e6e6e6;
+}
+
+.reply {
+  background: #f6fbff;
+  padding: 8px;
+  border-radius: 6px;
+  margin-bottom: 8px;
+}
+
+.reply-form-block {
+  margin-top: 12px;
+  border-top: 1px solid #eaeaea;
+  padding-top: 12px;
 }

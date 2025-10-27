@@ -1,13 +1,16 @@
 ﻿using AutoMapper;
 using Common.Exceptions;
+using Common.Helper;
 using Dal.Data;
 using Dal.Models;
 using Dto.Comment;
 using FluentValidation;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using Nest;
 using Service.Messaging;
+using Service.Services.Azure;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,17 +25,21 @@ namespace Service.Services.Comment;
 public class CommentService: ICommentService
 {
     private readonly IElasticClient _elasticClient;
+    private readonly IFileStorageService _fileServise;
     private readonly IRabbitMqPublisher _rabbitMqPublisher;
     private readonly ChatDbContext _db;
     private readonly IMapper _mapper;
     private readonly IValidator<CreateCommentDto> _createValidator;
-    public CommentService(ChatDbContext db, IMapper mapper, IValidator<CreateCommentDto> createValidator, IRabbitMqPublisher rabbitMqPublisher, IElasticClient elasticClient)
+    private readonly ILogger<CommentService> _logger;
+    public CommentService(ChatDbContext db, IMapper mapper, IValidator<CreateCommentDto> createValidator, IRabbitMqPublisher rabbitMqPublisher, IElasticClient elasticClient, ILogger<CommentService> logger, IFileStorageService fileServise)
     {
         _db = db;
         _mapper = mapper;
         _createValidator = createValidator;
         _rabbitMqPublisher = rabbitMqPublisher;
         _elasticClient = elasticClient;
+        _logger = logger;
+        _fileServise = fileServise;
     }
     #region create
     public async Task<int> CreateCommentAsync(CreateCommentDto dto)
@@ -46,18 +53,46 @@ public class CommentService: ICommentService
             commentEntity.UserId = currentUser.Id;
             commentEntity.User = currentUser;
             commentEntity.CreatedAt = DateTime.UtcNow;
+            commentEntity.Files = new List<FileModel>();
+            //addFiles
+            if (dto.Files != null && dto.Files.Count > 0)
+            { 
+                foreach (var item in dto.Files)
+                {
+                    var info = FileHelper.GetFileInfo(item); 
+                    var url = await _fileServise.UploadFileAsync(item, "test-user");
+                    commentEntity.Files.Add(new()
+                    {
+                        UploadedAt = DateTime.Now,
+                        Uri = url,
+                        Name = info.FileName,
+                        ContentType = info.ContentType,
+                        IsImage = info.IsImage
+                    });
+                } 
+            }
+
             _db.Comments.Add(commentEntity);
             await _db.SaveChangesAsync();
             await transaction.CommitAsync();
 
             // Отправляем новый комментарий в очередь RabbitMQ
             var comentDto = _mapper.Map<CommentDto>(commentEntity);
-            await _rabbitMqPublisher.PublishAsync(RabbitMqPublisher.RabbitCommentExcenge, "new_comment", comentDto);
+            if(commentEntity.Files.Count > 0)
+            {
+                foreach (var item in commentEntity.Files)
+                {
+                    var fileMap = _mapper.Map<CommentFileDto>(item);
+                    comentDto.Files.Add(fileMap);
+                }
+            }
+            await _rabbitMqPublisher.PublishAsync(RabbitMqPublisher.RabbitCommentQueue, "new_comment", comentDto);
 
             return commentEntity.Id;
         }
         catch (Exception ex)
-        { 
+        {
+            _logger.LogError(ex,ex.Message);
             await transaction.RollbackAsync();
             throw new BaseException(ex.Message, "CreateCommentAsync", "Comment Service error", HttpStatusCode.BadRequest);
         }
@@ -78,44 +113,7 @@ public class CommentService: ICommentService
             await  _db.SaveChangesAsync();
             return newUser;
         }
-    }
-    private string GetFileContentType(string fileExtension)
-    {
-        string contentType = "application/octet-stream"; // По умолчанию
-
-        switch (fileExtension.ToLowerInvariant())
-        {
-            case ".jpg":
-            case ".jpeg":
-                contentType = "image/jpeg";
-                break;
-            case ".png":
-                contentType = "image/png";
-                break;
-            case ".gif":
-                contentType = "image/gif";
-                break;
-            case ".tif":
-            case ".tiff":
-                contentType = "image/tiff";
-                break;
-            case ".svg":
-            case ".svgz":
-                contentType = "image/svg+xml";
-                break;
-            case ".pdf":
-                contentType = "application/pdf";
-                break;
-            case ".html":
-                contentType = "text/html";
-                break;
-            case ".txt":
-                contentType = "text/plain";
-                break;
-        }
-
-        return contentType;
-    }
+    } 
     #endregion create
 
     #region view 
@@ -142,9 +140,10 @@ public class CommentService: ICommentService
         }
         catch (Exception ex)
         {
+            _logger.LogError(ex, ex.Message);
             throw new BaseException(ex.Message, "GetParentCommentList", "Comment Service error", HttpStatusCode.BadRequest);
         }
-    }
+    } 
 
     // 2. Функция для поиска в Elasticsearch
     private async Task<ISearchResponse<CommentDto>> SearchInElasticAsync(
@@ -198,42 +197,50 @@ public class CommentService: ICommentService
         return searchResponse;
     }
 
-
-
-
-
-    // 3. Функция для поиска в базе данных, если нет данных в Elasticsearch
-    private async Task<List<CommentModel>> SearchInDatabaseAsync(int page, int pageSize, string sort, string sortField)
+    public async Task<List<CommentDto>> GetCommentsTreeAsync(int parentId)
     {
-        var query = _db.Comments.Where(c => c.ParentId == null)
-                                 .Include(a => a.User)
-                                 .Include(c => c.Replies)
-                                 .ThenInclude(r => r.User);
+        // 1. Получаем все комментарии
+        var searchResponse = await _elasticClient.SearchAsync<CommentDto>(s => s
+            .Index("comments")
+            .Size(10000)
+            .Query(q => q.MatchAll())
+        );
 
-       var res = ApplySorting(query, sort, sortField);
+        if (!searchResponse.IsValid)
+            return new List<CommentDto>();
 
-        return await res.Skip((page - 1) * pageSize).Take(pageSize).ToListAsync();
-    }
+        var allComments = searchResponse.Documents.ToList();
 
-    // 4. Функция для применения сортировки к запросу
-    private IQueryable<CommentModel> ApplySorting(IQueryable<CommentModel> query, string sort, string sortField)
-    {
-        if (!string.IsNullOrEmpty(sortField))
+        var childCounts = allComments
+        .Where(c => c.ParentId.HasValue)
+        .GroupBy(c => c.ParentId.Value)
+        .ToDictionary(g => g.Key, g => g.Count());
+
+        // Добавляем RepliesCount
+        foreach (var comment in allComments)
         {
-            var param = Expression.Parameter(typeof(CommentModel), "c");
-            Expression property = Expression.Property(param, sortField);
-
-            var lambda = Expression.Lambda<Func<CommentModel, object>>(Expression.Convert(property, typeof(object)), param);
-
-            return string.IsNullOrEmpty(sort) || sort.ToLower() == "desc"
-                ? query.OrderByDescending(lambda)
-                : query.OrderBy(lambda);
+            comment.RepliesCount = childCounts.ContainsKey(comment.Id)
+                ? childCounts[comment.Id]
+                : 0;
         }
 
-        return query.OrderByDescending(c => c.CreatedAt);  // По умолчанию сортировка по CreatedAt
+        // 2. Строим дерево комментариев
+        var commentDict = allComments.ToDictionary(c => c.Id);
+
+        foreach (var comment in allComments)
+        {
+            if (comment.ParentId.HasValue && commentDict.ContainsKey(comment.ParentId.Value))
+            {
+                commentDict[comment.ParentId.Value].Replies ??= new List<CommentDto>();
+                commentDict[comment.ParentId.Value].Replies.Add(comment);
+            }
+        }
+
+        // 3. Возвращаем все комментарии, у которых ParentId = parentId
+        return allComments.Where(c => c.ParentId == parentId).ToList();
     }
 
-    // 5. Функция для получения поля сортировки
+
     private string GetSortField(string sortField)
     {
         return sortField switch
@@ -244,20 +251,7 @@ public class CommentService: ICommentService
             _ => "createdAt"
         };
     }
-
-    // 6. Функция для добавления данных в Elasticsearch
-    private async Task AddToElasticAsync(List<CommentModel> items)
-    {
-        var bulkIndexResponse = await _elasticClient.BulkAsync(b => b
-            .IndexMany(items)  // Добавляем все найденные данные в Elasticsearch
-        );
-
-        if (!bulkIndexResponse.IsValid)
-        {
-            // Обработка ошибок индексации
-            throw new BaseException("Error indexing to Elasticsearch", "GetParentCommentList", "Elastic indexing error", HttpStatusCode.InternalServerError);
-        }
-    }
+     
 
     #endregion view
 }

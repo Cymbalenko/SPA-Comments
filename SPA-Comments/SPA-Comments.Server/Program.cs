@@ -8,6 +8,7 @@ using NLog;
 using NLog.Web;
 using Service.Extentions;
 using Service.GraphQL.Comment;
+using Service.Services.Comment;
 using Service.Validators.Comment;
 using SPA_Comments.Server;
 using SPA_Comments.Server.Hubs;
@@ -45,8 +46,9 @@ try
     var elasticsearchUri = builder.Configuration.GetValue<string>("ElasticSearch:Url");
     var settings = new ConnectionSettings(new Uri(elasticsearchUri))
         .DefaultIndex("comments");
-
-    builder.Services.AddSingleton<IElasticClient>(new ElasticClient(settings));
+    builder.Services.AddSignalR();
+    builder.Services.AddSingleton<IElasticClient>(new ElasticClient(settings)); 
+    builder.Services.AddScoped<ICommentHub, CommentHub>();
     builder.Services.AddControllers();
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen();
@@ -67,8 +69,16 @@ try
         .AddType<GetCommentListResponseType>()
         .AddFiltering()
         .AddSorting();
+
+    builder.Services.AddDistributedMemoryCache();
+    builder.Services.AddSession(options =>
+    {
+        options.IdleTimeout = TimeSpan.FromMinutes(10);
+    });
+
     builder.Host.UseNLog();
     var app = builder.Build();
+    app.UseSession();
     app.UseCors("AllowAll");
     app.UseDefaultFiles();
     app.UseStaticFiles();
@@ -85,7 +95,7 @@ try
 
     app.MapControllers();
     app.MapGraphQL("/graphql");
-
+    app.MapHub<CommentHub>("/hubs/comments");
     app.MapFallbackToFile("index.html");
 
     using (var scope = app.Services.CreateScope())
@@ -98,7 +108,7 @@ try
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Migration failed: {ex.Message}");
+            logger.Error($"Migration failed: {ex.Message}");
         }
     }
 

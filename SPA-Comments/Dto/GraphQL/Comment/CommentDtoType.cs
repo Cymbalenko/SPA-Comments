@@ -14,8 +14,9 @@ public class CommentDtoType : ObjectType<CommentDto>
         descriptor.Field(f => f.Id).Type<NonNullType<IntType>>();
         descriptor.Field(f => f.UserName).Type<StringType>();
         descriptor.Field(f => f.Text).Type<StringType>();
-        descriptor.Field(f => f.ParentCommentId).Type<IntType>();
+        descriptor.Field(f => f.ParentId).Type<IntType>();
         descriptor.Field(f => f.CreatedAt).Type<DateTimeType>();
+        descriptor.Field(f => f.RepliesCount).Type<IntType>();
         descriptor.Field(f => f.Replies).Type<ListType<CommentDtoType>>(); 
     }
 }

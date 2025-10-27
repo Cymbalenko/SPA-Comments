@@ -1,0 +1,36 @@
+# Комментарии SPA — Полнофункциональная система комментариев
+
+> **ASP.NET Core + Angular + Docker + Elasticsearch + RabbitMQ + Azurite + MSSQL**  
+> **Запуск с нуля из Git-репозитория — 100% автономно**
+
+---
+
+## Что это?
+
+**Комментарии SPA** — современная система комментариев с:
+- Деревом ответов
+- Загрузкой изображений и `.txt` файлов
+- Превью файлов 
+- Уведомлениями (SignalR + RabbitMQ)
+- CAPTCHA
+- CORS + SAS-токены
+- Полностью в Docker
+
+---
+
+## Как запустить с нуля (из Git)
+
+### Шаг 1: Клонируй репозиторий
+
+```bash
+git clone https://github.com/Cymbalenko/SPA-Comments.git
+cd comments-spa
+
+### Шаг 2: Установить докер и из корня проекта запустить команду
+ docker-compose up --build 
+
+### Шаг 3: Открить в браузере 
+Фронт - http://localhost:8080/
+Бек - http://localhost:8080/swagger/index.html
+ElasticSearch - http://localhost:5601
+RabbitMQ - http://localhost:15672
